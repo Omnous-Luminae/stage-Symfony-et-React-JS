@@ -6,6 +6,10 @@
 /backend/.env.*.local
 /backend/public/bundles/
 
+# ✅ AJOUTEZ CES LIGNES :
+/var/
+/vendor/
+
 # Node / React
 node_modules/
 /frontend/build/
