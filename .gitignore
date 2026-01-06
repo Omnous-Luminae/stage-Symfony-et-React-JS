@@ -7,8 +7,9 @@
 /backend/public/bundles/
 
 # Node / React
-/frontend/node_modules/
+node_modules/
 /frontend/build/
+/frontend/dist/
 /frontend/.pnp
 /frontend/.pnp.js
 /frontend/coverage/
