@@ -1,0 +1,32 @@
+# Backend Symfony
+/backend/var/
+/backend/vendor/
+/backend/.env.local
+/backend/.env.local.php
+/backend/.env.*.local
+/backend/public/bundles/
+
+# Node / React
+node_modules/
+/frontend/build/
+/frontend/dist/
+/frontend/.pnp
+/frontend/.pnp.js
+/frontend/coverage/
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Symfony logs
+*.log

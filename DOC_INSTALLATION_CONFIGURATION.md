@@ -374,6 +374,80 @@ Autorisez l'exécution de scripts :
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 ```
 
+### Erreur "unable to detect the front controller"
+
+Si vous obtenez cette erreur en démarrant le serveur :
+```
+unable to detect the front controller, disabling the PHP server
+error="Passthru script \"/index.php\" does not exist
+```
+
+**Cause :** Vous n'êtes pas dans un projet Symfony.
+
+**Solution :** Créez d'abord un projet Symfony :
+```powershell
+# Application web complète
+symfony new backend --version=7.2 --webapp
+
+# Puis démarrez le serveur dans le bon dossier
+cd backend
+symfony server:start --no-tls
+```
+
+### Warnings "Module XXX is already loaded"
+
+Si vous voyez ces warnings PHP :
+```
+PHP Warning: Module "bz2" is already loaded
+PHP Warning: Module "curl" is already loaded
+...
+```
+
+**Cause :** Extensions chargées en double dans `php.ini`.
+
+**Solution (optionnelle) :** Éditez `C:\xampp\php\php.ini` et commentez les duplicats :
+```powershell
+# Ouvrir php.ini avec notepad
+notepad C:\xampp\php\php.ini
+
+# Chercher les lignes dupliquées comme :
+# extension=curl
+# extension=curl
+# 
+# Et commentez une des deux avec un point-virgule :
+# extension=curl
+# ;extension=curl
+```
+
+**Note :** Ces warnings n'empêchent pas Symfony de fonctionner.
+
+### Erreur SSL "unable to get local issuer certificate"
+
+Si vous voyez des erreurs SSL lors de l'installation :
+```
+SSL certificate problem: unable to get local issuer certificate
+```
+
+**Solutions :**
+
+1. **Télécharger le certificat CA (recommandé) :**
+```powershell
+# Télécharger le bundle CA
+Invoke-WebRequest -Uri https://curl.se/ca/cacert.pem -OutFile C:\xampp\php\cacert.pem
+
+# Puis éditer php.ini
+notepad C:\xampp\php\php.ini
+
+# Ajouter cette ligne (sans le ;) :
+# curl.cainfo = "C:\xampp\php\cacert.pem"
+# openssl.cafile = "C:\xampp\php\cacert.pem"
+```
+
+2. **Ou démarrer le serveur avec --no-tls :**
+```powershell
+symfony server:start --no-tls
+```
+
 ### Port 8000 déjà utilisé
 
 Spécifiez un autre port :
