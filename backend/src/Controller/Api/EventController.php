@@ -41,65 +41,6 @@ class EventController extends AbstractController
         // Récupérer les événements de la base de données
         $dbEvents = $eventRepository->findAll();
         
-        // Ajouter les événements de démonstration s'il n'y en a pas
-        if (empty($dbEvents)) {
-            $demoEvents = [
-                [
-                    'id' => 1,
-                    'title' => 'Cours de Mathématiques',
-                    'start' => '2026-01-07T09:00:00',
-                    'end' => '2026-01-07T11:00:00',
-                    'backgroundColor' => self::COLOR_BLUE,
-                    'borderColor' => self::COLOR_BLUE,
-                    'extendedProps' => [
-                        'type' => 'course',
-                        'location' => 'Salle B204',
-                        'description' => 'Cours de mathématiques pour BTS SIO 1ère année'
-                    ]
-                ],
-                [
-                    'id' => 2,
-                    'title' => 'Réunion Pédagogique',
-                    'start' => '2026-01-07T14:00:00',
-                    'end' => '2026-01-07T16:00:00',
-                    'backgroundColor' => self::COLOR_GREEN,
-                    'borderColor' => self::COLOR_GREEN,
-                    'extendedProps' => [
-                        'type' => 'meeting',
-                        'location' => 'Salle des professeurs',
-                        'description' => 'Bilan du trimestre et axes d\'amélioration'
-                    ]
-                ],
-                [
-                    'id' => 3,
-                    'title' => 'Examen BTS SIO',
-                    'start' => '2026-01-08T10:00:00',
-                    'end' => '2026-01-08T12:00:00',
-                    'backgroundColor' => self::COLOR_RED,
-                    'borderColor' => self::COLOR_RED,
-                    'extendedProps' => [
-                        'type' => 'exam',
-                        'location' => 'Salle A101',
-                        'description' => 'Examen de développement web'
-                    ]
-                ],
-                [
-                    'id' => 4,
-                    'title' => 'Formation Continue',
-                    'start' => '2026-01-09T09:00:00',
-                    'end' => '2026-01-09T17:00:00',
-                    'backgroundColor' => self::COLOR_ORANGE,
-                    'borderColor' => self::COLOR_ORANGE,
-                    'extendedProps' => [
-                        'type' => 'training',
-                        'location' => 'Salle C301',
-                        'description' => 'Formation sur les nouvelles technologies'
-                    ]
-                ]
-            ];
-            return $this->json($demoEvents);
-        }
-        
         // Convertir les entités en format FullCalendar
         $events = [];
         foreach ($dbEvents as $event) {
