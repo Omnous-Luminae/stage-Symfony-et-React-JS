@@ -1,0 +1,64 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ project_name }}{% endblock %}
+
+{% block body %}
+<style>
+    .welcome-wrapper { 
+        margin: 2em auto; 
+        max-width: 900px; 
+        width: 95%; 
+        font: 18px/1.5 sans-serif;
+        text-align: center;
+    }
+    .welcome-wrapper h1 {
+        color: #2c3e50;
+        font-size: 2.5em;
+        margin-bottom: 0.5em;
+    }
+    .tech-stack {
+        display: flex;
+        justify-content: center;
+        gap: 2em;
+        margin: 2em 0;
+    }
+    .tech-card {
+        background: #f8f9fa;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .tech-card h3 {
+        color: #000D6B;
+        margin-top: 0;
+    }
+    .status {
+        color: #28a745;
+        font-weight: bold;
+    }
+</style>
+
+<div class="welcome-wrapper">
+    <h1>🚀 {{ project_name }}</h1>
+    
+    <p class="status">✅ Backend Symfony opérationnel!</p>
+    
+    <div class="tech-stack">
+        <div class="tech-card">
+            <h3>Backend</h3>
+            <p>Symfony {{ symfony_version }}</p>
+            <p>PHP 8.2.12</p>
+        </div>
+        
+        <div class="tech-card">
+            <h3>Frontend</h3>
+            <p>React ({{ react_version }})</p>
+            <p>Node.js 25.2.1</p>
+        </div>
+    </div>
+    
+    <p style="margin-top: 2em; color: #6c757d;">
+        Prêt pour le développement! 🎉
+    </p>
+</div>
+{% endblock %}
