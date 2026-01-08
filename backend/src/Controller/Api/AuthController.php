@@ -111,6 +111,68 @@ class AuthController extends AbstractController
         return $this->json(['available' => !$exists]);
     }
 
+    #[Route('/forgot-password', name: 'forgot_password', methods: ['POST'])]
+    public function forgotPassword(
+        Request $request,
+        UserRepository $userRepository
+    ): JsonResponse {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $email = $data['email'] ?? '';
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->json(['error' => 'Email invalide'], 400);
+        }
+
+        $user = $userRepository->findOneBy(['email' => $email]);
+        
+        // Toujours retourner succès pour éviter l'énumération des emails
+        if (!$user) {
+            return $this->json([
+                'message' => 'Si cet email existe, un lien de réinitialisation a été envoyé.'
+            ]);
+        }
+
+        // TODO: Générer un token de réinitialisation et envoyer l'email
+        // Pour l'instant, on simule l'envoi
+        
+        return $this->json([
+            'message' => 'Un email avec les instructions de réinitialisation a été envoyé.',
+            'debug' => 'En développement : Le token serait envoyé à ' . $email
+        ]);
+    }
+
+    #[Route('/reset-password-dev', name: 'reset_password_dev', methods: ['POST'])]
+    public function resetPasswordDev(
+        Request $request,
+        UserRepository $userRepository,
+        UserPasswordHasherInterface $passwordHasher
+    ): JsonResponse {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $email = $data['email'] ?? '';
+        $newPassword = $data['newPassword'] ?? '';
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->json(['error' => 'Email invalide'], 400);
+        }
+
+        if (!$this->isStrongPassword($newPassword)) {
+            return $this->json(['error' => 'Mot de passe trop faible (12+ caractères, majuscules, minuscules, chiffres, spéciaux)'], 400);
+        }
+
+        $user = $userRepository->findOneBy(['email' => $email]);
+        
+        if (!$user) {
+            return $this->json(['error' => 'Utilisateur non trouvé'], 404);
+        }
+
+        $user->setPassword($passwordHasher->hashPassword($user, $newPassword));
+        $this->em->flush();
+
+        return $this->json([
+            'message' => 'Mot de passe modifié avec succès (mode développement)'
+        ]);
+    }
+
     private function userPayload(User $user): array
     {
         return [

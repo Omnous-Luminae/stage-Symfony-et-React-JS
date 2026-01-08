@@ -71,7 +71,7 @@ function LoginPage() {
               />
               <span>Se souvenir de moi</span>
             </label>
-            <a className="login-link" href="#">Mot de passe oublié ?</a>
+            <Link className="login-link" to="/forgot-password">Mot de passe oublié ?</Link>
           </div>
 
           {authError && <div className="login-error">{authError}</div>}

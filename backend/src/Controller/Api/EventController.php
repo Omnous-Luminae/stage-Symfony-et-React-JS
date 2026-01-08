@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Entity\Event;
+use App\Entity\Calendar;
 use App\Repository\EventRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -82,15 +83,27 @@ class EventController extends AbstractController
             $event->setLocation($data['location'] ?? '');
             $event->setDescription($data['description'] ?? '');
             
-            // Définir la couleur basée sur le type
-            $colorMap = [
-                'course' => self::COLOR_BLUE,
-                'meeting' => self::COLOR_GREEN,
-                'exam' => self::COLOR_RED,
-                'training' => self::COLOR_ORANGE,
-                'other' => '#9c27b0'
-            ];
-            $event->setColor($colorMap[$event->getType()] ?? self::COLOR_BLUE);
+            // Si calendarId est fourni, associer l'événement à ce calendrier
+            if (isset($data['calendarId']) && !empty($data['calendarId'])) {
+                $calendar = $entityManager->getRepository(Calendar::class)->find($data['calendarId']);
+                if ($calendar) {
+                    $event->setCalendar($calendar);
+                    // Utiliser la couleur du calendrier si disponible
+                    $event->setColor($calendar->getColor());
+                } else {
+                    return $this->json(['error' => 'Calendar not found'], 404);
+                }
+            } else {
+                // Événement général, utiliser la couleur basée sur le type
+                $colorMap = [
+                    'course' => self::COLOR_BLUE,
+                    'meeting' => self::COLOR_GREEN,
+                    'exam' => self::COLOR_RED,
+                    'training' => self::COLOR_ORANGE,
+                    'other' => '#9c27b0'
+                ];
+                $event->setColor($colorMap[$event->getType()] ?? self::COLOR_BLUE);
+            }
 
             // Persister l'événement
             $entityManager->persist($event);
@@ -197,6 +210,8 @@ class EventController extends AbstractController
             $endDate = $start->format('Y-m-d\TH:i:s');
         }
         
+        $calendar = $event->getCalendar();
+        
         return [
             'id' => $event->getId(),
             'title' => $event->getTitle(),
@@ -207,7 +222,9 @@ class EventController extends AbstractController
             'extendedProps' => [
                 'type' => $event->getType(),
                 'location' => $event->getLocation(),
-                'description' => $event->getDescription()
+                'description' => $event->getDescription(),
+                'calendarId' => $calendar ? $calendar->getId() : null,
+                'calendarName' => $calendar ? $calendar->getName() : 'Événement général'
             ]
         ];
     }
