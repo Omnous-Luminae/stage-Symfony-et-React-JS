@@ -11,7 +11,7 @@ function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      const to = location.state?.from?.pathname || '/calendar'
+      const to = location.state?.from?.pathname || '/dashboard'
       navigate(to, { replace: true })
     }
   }, [user, navigate, location])
