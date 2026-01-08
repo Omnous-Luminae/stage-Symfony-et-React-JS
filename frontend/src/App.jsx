@@ -204,7 +204,7 @@ function App() {
             Gestion d'agenda collaborative pour professeurs et personnel
           </p>
           <p style={{ margin: '10px 0 0 0', fontSize: '0.9em', opacity: 0.8 }}>
-            🔗 Connecté à l'API Symfony (http://localhost:8001/api)
+            🔗 Connecté à l'API Symfony (http://localhost:8000/api)
           </p>
         </div>
 
