@@ -7,65 +7,95 @@ import { eventService } from '../api/events'
 import { useAuth } from '../auth/AuthContext'
 import '../App.css'
 
+const typeColors = {
+  course: '#3788d8',
+  meeting: '#4caf50',
+  exam: '#f44336',
+  training: '#ff9800',
+  other: '#9c27b0'
+}
+
+const defaultFormData = {
+  title: '',
+  startDate: '',
+  endDate: '',
+  location: '',
+  type: 'other',
+  description: ''
+}
+
+function toLocalInputValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
+  return date.toISOString().slice(0, 16)
+}
+
+function mapApiEvent(event) {
+  const type = event.extendedProps?.type ?? event.type ?? 'other'
+  const location = event.extendedProps?.location ?? event.location ?? ''
+  const description = event.extendedProps?.description ?? event.description ?? ''
+  const color = event.backgroundColor || typeColors[type] || '#667eea'
+
+  return {
+    id: event.id,
+    title: event.title,
+    start: event.start,
+    end: event.end,
+    backgroundColor: color,
+    borderColor: color,
+    extendedProps: {
+      type,
+      location,
+      description,
+      color
+    }
+  }
+}
+
 function CalendarPage() {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const [events, setEvents] = useState([])
   const [error, setError] = useState(null)
+  const [filterType, setFilterType] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    startDate: '',
-    endDate: '',
-    location: '',
-    type: 'other',
-    description: ''
-  })
+  const [formData, setFormData] = useState(defaultFormData)
+
+  const filteredEvents = filterType
+    ? events.filter(evt => (evt.extendedProps?.type || evt.type) === filterType)
+    : events
+  const calendarEvents = filteredEvents.map(evt => ({ ...evt }))
+
+  const loadEvents = async () => {
+    try {
+      setError(null)
+      const response = await eventService.getAll()
+      const fetched = (response?.data || []).map(mapApiEvent)
+      setEvents(fetched)
+    } catch (err) {
+      console.error('Erreur lors du chargement des événements:', err)
+      setError("Impossible de charger les événements. Vérifiez que le serveur Symfony est lancé.")
+    }
+  }
 
   useEffect(() => {
     loadEvents()
   }, [])
 
-  const loadEvents = async () => {
-    try {
-      const response = await eventService.getAll()
-      setEvents(response.data)
-      setError(null)
-    } catch (err) {
-      console.error('Erreur lors du chargement des événements:', err)
-      setError('Impossible de charger les événements. Vérifiez que le serveur Symfony est lancé.')
-    }
-  }
-
-  const handleDateClick = async (arg) => {
-    setSelectedDate(arg.dateStr)
-    setFormData({
-      title: '',
-      startDate: arg.dateStr + 'T09:00',
-      endDate: arg.dateStr + 'T10:00',
-      location: '',
-      type: 'other',
-      description: ''
-    })
+  const handleDateClick = (info) => {
+    const start = `${info.dateStr}T08:00`
+    const end = `${info.dateStr}T09:00`
+    setFormData({ ...defaultFormData, startDate: start, endDate: end })
     setShowModal(true)
-  }
-
-  const toLocalInputValue = (date) => {
-    const d = new Date(date)
-    const tzOffset = d.getTimezoneOffset() * 60000
-    const local = new Date(d.getTime() - tzOffset)
-    return local.toISOString().slice(0, 16)
   }
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
-
     try {
-      const newEventData = {
+      const payload = {
         title: formData.title,
         start: formData.startDate,
         end: formData.endDate,
@@ -74,24 +104,10 @@ function CalendarPage() {
         description: formData.description
       }
 
-      const response = await eventService.create(newEventData)
-
-      const newEvent = {
-        id: response.data.id,
-        title: response.data.title,
-        start: response.data.start,
-        end: response.data.end,
-        backgroundColor: response.data.backgroundColor || '#FF6B6B',
-        borderColor: response.data.borderColor || '#FF6B6B',
-        extendedProps: {
-          type: response.data.extendedProps?.type,
-          location: response.data.extendedProps?.location,
-          description: response.data.extendedProps?.description,
-          color: response.data.backgroundColor
-        }
-      }
-
-      setEvents([...events, newEvent])
+      const response = await eventService.create(payload)
+      const newEvent = mapApiEvent(response.data)
+      setEvents(prev => [...prev, newEvent])
+      setFormData(defaultFormData)
       setShowModal(false)
     } catch (err) {
       console.error("Erreur lors de la création de l'événement:", err)
@@ -104,6 +120,46 @@ function CalendarPage() {
     setShowDetailsModal(true)
   }
 
+  const persistEventChange = async (fcEvent) => {
+    const type = fcEvent.extendedProps?.type || 'other'
+    const location = fcEvent.extendedProps?.location || ''
+    const description = fcEvent.extendedProps?.description || ''
+
+    const payload = {
+      title: fcEvent.title,
+      start: fcEvent.startStr,
+      end: fcEvent.endStr || fcEvent.startStr,
+      type,
+      location,
+      description
+    }
+
+    const response = await eventService.update(fcEvent.id, payload)
+    return mapApiEvent(response.data)
+  }
+
+  const handleEventDrop = async (info) => {
+    try {
+      const updated = await persistEventChange(info.event)
+      setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
+    } catch (err) {
+      console.error("Erreur lors du déplacement de l'événement:", err)
+      info.revert()
+      alert("Impossible d'enregistrer le déplacement. Réessayez.")
+    }
+  }
+
+  const handleEventResize = async (info) => {
+    try {
+      const updated = await persistEventChange(info.event)
+      setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
+    } catch (err) {
+      console.error("Erreur lors du redimensionnement de l'événement:", err)
+      info.revert()
+      alert("Impossible d'enregistrer la nouvelle durée. Réessayez.")
+    }
+  }
+
   const handleEditEvent = () => {
     if (!selectedEvent) return
     setFormData({
@@ -114,16 +170,16 @@ function CalendarPage() {
       type: selectedEvent.extendedProps?.type || 'other',
       description: selectedEvent.extendedProps?.description || ''
     })
-    setIsEditing(true)
     setShowDetailsModal(false)
     setShowEditModal(true)
   }
 
   const handleUpdateEvent = async (e) => {
     e.preventDefault()
+    if (!selectedEvent) return
 
     try {
-      const updatedEventData = {
+      const payload = {
         title: formData.title,
         start: formData.startDate,
         end: formData.endDate,
@@ -132,27 +188,11 @@ function CalendarPage() {
         description: formData.description
       }
 
-      const response = await eventService.update(selectedEvent.id, updatedEventData)
-
-      const updatedEvent = {
-        id: response.data.id,
-        title: response.data.title,
-        start: response.data.start,
-        end: response.data.end,
-        backgroundColor: response.data.backgroundColor || '#FF6B6B',
-        borderColor: response.data.borderColor || '#FF6B6B',
-        extendedProps: {
-          type: response.data.extendedProps?.type,
-          location: response.data.extendedProps?.location,
-          description: response.data.extendedProps?.description,
-          color: response.data.backgroundColor
-        }
-      }
-
-      setEvents(events.map(e => Number(e.id) === Number(response.data.id) ? updatedEvent : e))
+      const response = await eventService.update(selectedEvent.id, payload)
+      const updatedEvent = mapApiEvent(response.data)
+      setEvents(prev => prev.map(e => Number(e.id) === Number(response.data.id) ? updatedEvent : e))
       setShowEditModal(false)
       setSelectedEvent(null)
-      setIsEditing(false)
     } catch (err) {
       console.error("Erreur lors de la mise à jour de l'événement:", err)
       alert("Erreur lors de la mise à jour de l'événement")
@@ -164,7 +204,7 @@ function CalendarPage() {
 
     try {
       await eventService.delete(selectedEvent.id)
-      setEvents(events.filter(e => e.id !== Number.parseInt(selectedEvent.id)))
+      setEvents(prev => prev.filter(e => e.id !== Number.parseInt(selectedEvent.id)))
       setShowDetailsModal(false)
       setSelectedEvent(null)
     } catch (err) {
@@ -195,6 +235,11 @@ function CalendarPage() {
               <p style={{ margin: '8px 0 0 0', fontSize: '0.9em', opacity: 0.8 }}>
                 🔗 Connecté à l'API Symfony (http://localhost:8001/api)
               </p>
+              {user && (
+                <p style={{ margin: '12px 0 0 0', fontSize: '0.95em', opacity: 0.95, fontWeight: '600' }}>
+                  👤 Connecté en tant que : <strong>{user.firstName} {user.lastName}</strong>
+                </p>
+              )}
             </div>
             <button
               type="button"
@@ -235,34 +280,69 @@ function CalendarPage() {
           borderRadius: '10px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
-          <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ padding: '10px 20px', background: '#e3f2fd', borderRadius: '5px' }}>
-              <strong>🔵 Cours</strong>
-            </div>
-            <div style={{ padding: '10px 20px', background: '#e8f5e9', borderRadius: '5px' }}>
-              <strong>🟢 Réunion</strong>
-            </div>
-            <div style={{ padding: '10px 20px', background: '#ffebee', borderRadius: '5px' }}>
-              <strong>🔴 Examen</strong>
-            </div>
-            <div style={{ padding: '10px 20px', background: '#fff3e0', borderRadius: '5px' }}>
-              <strong>🟠 Formation</strong>
-            </div>
-            <button 
-              onClick={loadEvents}
+          <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {[
+              { key: 'course', label: 'Cours', color: '#e3f2fd', icon: '🔵' },
+              { key: 'meeting', label: 'Réunion', color: '#e8f5e9', icon: '🟢' },
+              { key: 'exam', label: 'Examen', color: '#ffebee', icon: '🔴' },
+              { key: 'training', label: 'Formation', color: '#fff3e0', icon: '🟠' },
+              { key: 'other', label: 'Autre', color: '#f3e5f5', icon: '🟣' }
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setFilterType(filterType === item.key ? null : item.key)}
+                style={{
+                  padding: '10px 16px',
+                  background: filterType === item.key ? item.color : '#fff',
+                  border: filterType === item.key ? `2px solid ${item.color}` : '2px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+                }}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setFilterType(null)}
               style={{
-                marginLeft: 'auto',
-                padding: '10px 20px',
+                padding: '10px 16px',
                 background: '#667eea',
                 color: 'white',
                 border: 'none',
-                borderRadius: '5px',
+                borderRadius: '8px',
+                fontWeight: 700,
                 cursor: 'pointer',
-                fontWeight: 'bold'
+                boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
               }}
             >
-              🔄 Actualiser
+              🔄 Réinitialiser
             </button>
+            <div style={{ marginLeft: 'auto' }}>
+              <button
+                type="button"
+                onClick={loadEvents}
+                style={{
+                  padding: '12px 18px',
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                }}
+              >
+                🔁 Recharger
+              </button>
+            </div>
           </div>
 
           <FullCalendar
@@ -273,9 +353,11 @@ function CalendarPage() {
               center: 'title',
               right: 'dayGridMonth,timeGridWeek,timeGridDay'
             }}
-            events={events}
+            events={calendarEvents}
             dateClick={handleDateClick}
             eventClick={handleEventClick}
+            eventDrop={handleEventDrop}
+            eventResize={handleEventResize}
             editable={true}
             selectable={true}
             selectMirror={true}
@@ -293,10 +375,10 @@ function CalendarPage() {
             slotMaxTime="19:00:00"
           />
 
-          <div style={{ 
-            marginTop: '20px', 
-            padding: '15px', 
-            background: '#f5f5f5', 
+          <div style={{
+            marginTop: '20px',
+            padding: '15px',
+            background: '#f5f5f5',
             borderRadius: '5px',
             fontSize: '0.9em',
             color: '#666'
@@ -350,14 +432,14 @@ function CalendarPage() {
                 Remplissez les informations de l'événement
               </p>
             </div>
-            
+
             <form onSubmit={handleFormSubmit} style={{ padding: '30px' }}>
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
-                  marginBottom: '8px', 
+                  marginBottom: '8px',
                   fontWeight: '600',
                   color: '#333',
                   fontSize: '14px'
@@ -369,7 +451,7 @@ function CalendarPage() {
                   type="text"
                   required
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '12px 15px',
@@ -379,17 +461,17 @@ function CalendarPage() {
                     transition: 'border-color 0.2s',
                     outline: 'none'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                  onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  onFocus={(e) => (e.target.style.borderColor = '#667eea')}
+                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
                 />
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
-                  marginBottom: '12px', 
+                  marginBottom: '12px',
                   fontWeight: '600',
                   color: '#333',
                   fontSize: '14px'
@@ -407,7 +489,7 @@ function CalendarPage() {
                     <button
                       key={type.value}
                       type="button"
-                      onClick={() => setFormData({...formData, type: type.value})}
+                      onClick={() => setFormData({ ...formData, type: type.value })}
                       style={{
                         padding: '12px 15px',
                         border: formData.type === type.value ? `3px solid ${type.color}` : '2px solid #e0e0e0',
@@ -443,7 +525,7 @@ function CalendarPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setFormData({...formData, type: 'other'})}
+                  onClick={() => setFormData({ ...formData, type: 'other' })}
                   style={{
                     width: '100%',
                     marginTop: '10px',
@@ -481,11 +563,11 @@ function CalendarPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
                 <div>
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '8px',
-                    marginBottom: '8px', 
+                    marginBottom: '8px',
                     fontWeight: '600',
                     color: '#333',
                     fontSize: '14px'
@@ -497,7 +579,7 @@ function CalendarPage() {
                     type="datetime-local"
                     required
                     value={formData.startDate}
-                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '12px 15px',
@@ -506,16 +588,16 @@ function CalendarPage() {
                       fontSize: '14px',
                       outline: 'none'
                     }}
-                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                    onFocus={(e) => (e.target.style.borderColor = '#667eea')}
+                    onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
                   />
                 </div>
                 <div>
-                  <label style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '8px',
-                    marginBottom: '8px', 
+                    marginBottom: '8px',
                     fontWeight: '600',
                     color: '#333',
                     fontSize: '14px'
@@ -527,7 +609,7 @@ function CalendarPage() {
                     type="datetime-local"
                     required
                     value={formData.endDate}
-                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '12px 15px',
@@ -536,18 +618,18 @@ function CalendarPage() {
                       fontSize: '14px',
                       outline: 'none'
                     }}
-                    onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                    onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                    onFocus={(e) => (e.target.style.borderColor = '#667eea')}
+                    onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
                   />
                 </div>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
-                  marginBottom: '8px', 
+                  marginBottom: '8px',
                   fontWeight: '600',
                   color: '#333',
                   fontSize: '14px'
@@ -558,7 +640,7 @@ function CalendarPage() {
                 <input
                   type="text"
                   value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '12px 15px',
@@ -567,17 +649,17 @@ function CalendarPage() {
                     fontSize: '15px',
                     outline: 'none'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                  onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  onFocus={(e) => (e.target.style.borderColor = '#667eea')}
+                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
                 />
               </div>
 
               <div style={{ marginBottom: '25px' }}>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '8px',
-                  marginBottom: '8px', 
+                  marginBottom: '8px',
                   fontWeight: '600',
                   color: '#333',
                   fontSize: '14px'
@@ -587,7 +669,7 @@ function CalendarPage() {
                 </label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows="4"
                   style={{
                     width: '100%',
@@ -600,14 +682,14 @@ function CalendarPage() {
                     outline: 'none',
                     lineHeight: '1.5'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                  onBlur={(e) => e.target.style.borderColor = '#e0e0e0'}
+                  onFocus={(e) => (e.target.style.borderColor = '#667eea')}
+                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
                 />
               </div>
 
-              <div style={{ 
-                display: 'flex', 
-                gap: '12px', 
+              <div style={{
+                display: 'flex',
+                gap: '12px',
                 justifyContent: 'flex-end',
                 paddingTop: '20px',
                 borderTop: '2px solid #f0f0f0'
@@ -701,11 +783,11 @@ function CalendarPage() {
                 {selectedEvent.title}
               </h2>
             </div>
-            
+
             <div style={{ padding: '30px' }}>
               <div style={{ marginBottom: '25px' }}>
-                <div style={{ 
-                  display: 'grid', 
+                <div style={{
+                  display: 'grid',
                   gap: '20px',
                   gridTemplateColumns: '1fr'
                 }}>
@@ -722,19 +804,19 @@ function CalendarPage() {
                     <div>
                       <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}>Horaires</div>
                       <div style={{ color: '#666' }}>
-                        <div>Début: {selectedEvent.start.toLocaleString('fr-FR', { 
-                          weekday: 'long', 
-                          year: 'numeric', 
-                          month: 'long', 
+                        <div>Début: {selectedEvent.start.toLocaleString('fr-FR', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
                         })}</div>
                         {selectedEvent.end && (
-                          <div>Fin: {selectedEvent.end.toLocaleString('fr-FR', { 
-                            weekday: 'long', 
-                            year: 'numeric', 
-                            month: 'long', 
+                          <div>Fin: {selectedEvent.end.toLocaleString('fr-FR', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
                             day: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit'
@@ -755,18 +837,18 @@ function CalendarPage() {
                       borderLeft: '4px solid ' + (selectedEvent.backgroundColor || '#667eea')
                     }}>
                       <span style={{ fontSize: '1.5em' }}>
-                        {selectedEvent.extendedProps.type === 'course' ? '📚' : 
-                         selectedEvent.extendedProps.type === 'meeting' ? '👥' : 
-                         selectedEvent.extendedProps.type === 'exam' ? '📝' : 
-                         selectedEvent.extendedProps.type === 'training' ? '🎓' : '📌'}
+                        {selectedEvent.extendedProps.type === 'course' ? '📚' :
+                        selectedEvent.extendedProps.type === 'meeting' ? '👥' :
+                        selectedEvent.extendedProps.type === 'exam' ? '📝' :
+                        selectedEvent.extendedProps.type === 'training' ? '🎓' : '📌'}
                       </span>
                       <div>
                         <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}>Type</div>
                         <div style={{ color: '#666' }}>
-                          {selectedEvent.extendedProps.type === 'course' ? 'Cours' : 
-                           selectedEvent.extendedProps.type === 'meeting' ? 'Réunion' : 
-                           selectedEvent.extendedProps.type === 'exam' ? 'Examen' : 
-                           selectedEvent.extendedProps.type === 'training' ? 'Formation' : 'Autre'}
+                          {selectedEvent.extendedProps.type === 'course' ? 'Cours' :
+                          selectedEvent.extendedProps.type === 'meeting' ? 'Réunion' :
+                          selectedEvent.extendedProps.type === 'exam' ? 'Examen' :
+                          selectedEvent.extendedProps.type === 'training' ? 'Formation' : 'Autre'}
                         </div>
                       </div>
                     </div>
@@ -825,8 +907,8 @@ function CalendarPage() {
                     fontSize: '14px',
                     transition: 'background 0.2s'
                   }}
-                  onMouseOver={(e) => e.target.style.background = '#5a6268'}
-                  onMouseOut={(e) => e.target.style.background = '#6c757d'}
+                  onMouseOver={(e) => (e.target.style.background = '#5a6268')}
+                  onMouseOut={(e) => (e.target.style.background = '#6c757d')}
                 >
                   Fermer
                 </button>
@@ -844,8 +926,8 @@ function CalendarPage() {
                     fontSize: '14px',
                     transition: 'background 0.2s'
                   }}
-                  onMouseOver={(e) => e.target.style.background = '#0b5ed7'}
-                  onMouseOut={(e) => e.target.style.background = '#0d6efd'}
+                  onMouseOver={(e) => (e.target.style.background = '#0b5ed7')}
+                  onMouseOut={(e) => (e.target.style.background = '#0d6efd')}
                 >
                   ✏️ Modifier
                 </button>
@@ -863,8 +945,8 @@ function CalendarPage() {
                     fontSize: '14px',
                     transition: 'background 0.2s'
                   }}
-                  onMouseOver={(e) => e.target.style.background = '#c82333'}
-                  onMouseOut={(e) => e.target.style.background = '#dc3545'}
+                  onMouseOver={(e) => (e.target.style.background = '#c82333')}
+                  onMouseOut={(e) => (e.target.style.background = '#dc3545')}
                 >
                   🗑️ Supprimer
                 </button>
