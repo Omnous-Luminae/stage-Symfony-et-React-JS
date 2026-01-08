@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import Layout from '../components/Layout'
 import { eventService } from '../api/events'
 import { useAuth } from '../auth/AuthContext'
 import '../App.css'
@@ -234,7 +235,7 @@ function CalendarPage() {
   }
 
   return (
-    <>
+    <Layout>
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -1198,7 +1199,7 @@ function CalendarPage() {
           </div>
         </div>
       )}
-    </>
+    </Layout>
   )
 }
 

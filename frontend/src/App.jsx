@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import DashboardPage from './pages/DashboardPage'
 import CalendarPage from './pages/CalendarPage'
+import AgendasPage from './pages/AgendasPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import { AuthProvider, RequireAuth } from './auth/AuthContext'
@@ -13,6 +15,14 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route
+            path="/dashboard"
+            element={
+              <RequireAuth>
+                <DashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/calendar"
             element={
               <RequireAuth>
@@ -20,6 +30,15 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/agendas"
+            element={
+              <RequireAuth>
+                <AgendasPage />
+              </RequireAuth>
+            }
+          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
