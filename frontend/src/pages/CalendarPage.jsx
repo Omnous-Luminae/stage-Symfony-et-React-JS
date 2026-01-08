@@ -31,6 +31,18 @@ function toLocalInputValue(value) {
   return date.toISOString().slice(0, 16)
 }
 
+function formatDateForInput(dateStr) {
+  if (!dateStr) return ''
+  return dateStr.split('T')[0] + 'T08:00'
+}
+
+function formatEndDateForInput(dateStr) {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  date.setDate(date.getDate() + 1)
+  return date.toISOString().split('T')[0] + 'T09:00'
+}
+
 function mapApiEvent(event) {
   const type = event.extendedProps?.type ?? event.type ?? 'other'
   const location = event.extendedProps?.location ?? event.location ?? ''
@@ -90,6 +102,14 @@ function CalendarPage() {
     const end = `${info.dateStr}T09:00`
     setFormData({ ...defaultFormData, startDate: start, endDate: end })
     setShowModal(true)
+  }
+
+  const handleSelectRange = (info) => {
+    const startDate = formatDateForInput(info.startStr)
+    const endDate = formatEndDateForInput(info.endStr)
+    setFormData({ ...defaultFormData, startDate, endDate })
+    setShowModal(true)
+    info.jsEvent.preventDefault()
   }
 
   const handleFormSubmit = async (e) => {
@@ -355,6 +375,7 @@ function CalendarPage() {
             }}
             events={calendarEvents}
             dateClick={handleDateClick}
+            select={handleSelectRange}
             eventClick={handleEventClick}
             eventDrop={handleEventDrop}
             eventResize={handleEventResize}
