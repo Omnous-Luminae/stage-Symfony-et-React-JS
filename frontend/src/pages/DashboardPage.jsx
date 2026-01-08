@@ -128,7 +128,7 @@ function DashboardPage() {
                     <div key={event.id} className="event-item">
                       <span className="event-icon">{getEventTypeIcon(event.extendedProps?.type)}</span>
                       <div className="event-info">
-                        <div className="event-time">{formatTime(event.start)}</div>
+                        <div className="event-time">{formatTime(event.start)} - {formatTime(event.end)}</div>
                         <div className="event-title">{event.title}</div>
                         {event.extendedProps?.location && (
                           <div className="event-location">📍 {event.extendedProps.location}</div>

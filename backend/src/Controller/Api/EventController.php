@@ -187,11 +187,21 @@ class EventController extends AbstractController
      */
     private function eventToArray(Event $event): array
     {
+        $startDate = $event->getStartDate() ? $event->getStartDate()->format('Y-m-d\TH:i:s') : null;
+        $endDate = $event->getEndDate() ? $event->getEndDate()->format('Y-m-d\TH:i:s') : null;
+        
+        // Si endDate est absent, le générer à partir de startDate + 1 heure
+        if (!$endDate && $startDate) {
+            $start = new \DateTime($startDate);
+            $start->add(new \DateInterval('PT1H'));
+            $endDate = $start->format('Y-m-d\TH:i:s');
+        }
+        
         return [
             'id' => $event->getId(),
             'title' => $event->getTitle(),
-            'start' => $event->getStartDate()->format('Y-m-d\TH:i:s'),
-            'end' => $event->getEndDate()->format('Y-m-d\TH:i:s'),
+            'start' => $startDate,
+            'end' => $endDate,
             'backgroundColor' => $event->getColor(),
             'borderColor' => $event->getColor(),
             'extendedProps' => [
