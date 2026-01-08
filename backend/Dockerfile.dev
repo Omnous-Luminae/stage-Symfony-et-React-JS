@@ -1,0 +1,51 @@
+# Dockerfile de développement pour le backend Symfony
+FROM php:8.2-fpm-alpine
+
+# Installation des dépendances système
+RUN apk add --no-cache \
+    git \
+    unzip \
+    bash \
+    icu-dev \
+    libzip-dev \
+    mysql-client \
+    oniguruma-dev \
+    linux-headers \
+    $PHPIZE_DEPS
+
+# Installation de Xdebug pour le développement
+RUN pecl install xdebug && docker-php-ext-enable xdebug
+
+# Installation des extensions PHP nécessaires pour Symfony
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    intl \
+    zip \
+    opcache \
+    mysqli
+
+# Configuration de Xdebug
+RUN echo "xdebug.mode=debug,coverage" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.start_with_request=yes" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.client_host=host.docker.internal" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.client_port=9003" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+
+# Installation de Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Installation du Symfony CLI
+RUN wget https://get.symfony.com/cli/installer -O - | bash && \
+    mv /root/.symfony*/bin/symfony /usr/local/bin/symfony
+
+# Configuration du répertoire de travail
+WORKDIR /var/www/html
+
+# Configuration des permissions
+RUN chown -R www-data:www-data /var/www/html
+
+# Exposition du port
+EXPOSE 9000
+
+# Commande par défaut
+CMD ["php-fpm"]
