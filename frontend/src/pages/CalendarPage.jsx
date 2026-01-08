@@ -39,7 +39,7 @@ function formatDateForInput(dateStr) {
 function formatEndDateForInput(dateStr) {
   if (!dateStr) return ''
   const date = new Date(dateStr)
-  date.setDate(date.getDate() + 1)
+  date.setDate(date.getDate() - 1)
   return date.toISOString().split('T')[0] + 'T09:00'
 }
 
