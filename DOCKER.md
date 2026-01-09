@@ -249,10 +249,37 @@ Variables importantes :
 
 Chaque membre de l'équipe doit :
 
-1. Cloner le repository
-2. Copier `.env.docker` vers `.env`
-3. Exécuter `docker-compose up -d`
-4. Initialiser la base de données
+1. **Cloner le repository Git** (remplacer par l'URL de votre dépôt Git) :
+```powershell
+# Exemple avec HTTPS :
+git clone https://github.com/votre-username/Stage.git
+
+# Ou avec SSH :
+git clone git@github.com:votre-username/Stage.git
+
+# Entrer dans le dossier
+cd Stage
+```
+
+2. **Copier le fichier d'environnement** :
+```powershell
+Copy-Item .env.docker .env
+```
+
+3. **Démarrer tous les services Docker** :
+```powershell
+docker-compose up -d
+```
+
+4. **Installer les dépendances backend** :
+```powershell
+docker-compose exec backend composer install
+```
+
+5. **Initialiser la base de données** :
+```powershell
+docker-compose exec backend php bin/console doctrine:migrations:migrate --no-interaction
+```
 
 Tout le monde aura ainsi :
 - PHP 8.2

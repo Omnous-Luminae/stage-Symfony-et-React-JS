@@ -6,10 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8001',
-        changeOrigin: false,
+        target: 'http://172.17.0.1:8000',
+        changeOrigin: true,
         // ensure proper path pass-through to PHP server
         rewrite: (path) => path,
       },
