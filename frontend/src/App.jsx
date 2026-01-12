@@ -3,7 +3,6 @@ import DashboardPage from './pages/DashboardPage'
 import CalendarPage from './pages/CalendarPage'
 import AgendasPage from './pages/AgendasPage'
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import { AuthProvider, RequireAuth } from './auth/AuthContext'
 import './App.css'
@@ -14,7 +13,6 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/dashboard"
@@ -26,11 +24,7 @@ function App() {
           />
           <Route
             path="/calendar"
-            element={
-              <RequireAuth>
-                <CalendarPage />
-              </RequireAuth>
-            }
+            element={<CalendarPage />}
           />
           <Route
             path="/agendas"
@@ -40,8 +34,8 @@ function App() {
               </RequireAuth>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/calendar" replace />} />
+          <Route path="*" element={<Navigate to="/calendar" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

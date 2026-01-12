@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
+  const isAuthenticated = !!user
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -36,27 +37,14 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const register = async ({ email, firstName, lastName, password }) => {
-    setAuthError(null)
-    try {
-      const res = await authService.register({ email, firstName, lastName, password })
-      setUser(res.data.user || res.data)
-      return true
-    } catch (err) {
-      const serverMsg = err?.response?.data?.error || err?.response?.data?.message
-      setAuthError(serverMsg || 'Inscription impossible. Vérifiez les informations fournies.')
-      return false
-    }
-  }
-
   const logout = () => {
     authService.logout().catch(() => {})
     setUser(null)
   }
 
   const value = useMemo(
-    () => ({ user, loading, authError, login, register, logout }),
-    [user, loading, authError]
+    () => ({ user, loading, authError, isAuthenticated, login, logout }),
+    [user, loading, authError, isAuthenticated]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

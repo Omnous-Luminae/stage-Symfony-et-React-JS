@@ -78,8 +78,9 @@ function LoginPage() {
 
           <button type="submit" className="login-button">Se connecter</button>
 
-          <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '13px', color: '#4b5563' }}>
-            Pas de compte ? <Link className="login-link" to="/register">Créer un compte</Link>
+          <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '13px', color: '#4b5563', display: 'grid', gap: '6px' }}>
+            <span>Les comptes sont créés par un administrateur.</span>
+            <Link className="login-link" to="/calendar">Accéder à l'agenda sans se connecter</Link>
           </div>
         </form>
       </div>

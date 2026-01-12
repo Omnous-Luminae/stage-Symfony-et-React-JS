@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -67,7 +68,7 @@ function mapApiEvent(event) {
 }
 
 function CalendarPage() {
-  const { logout, user } = useAuth()
+  const { logout, user, isAuthenticated } = useAuth()
   const [events, setEvents] = useState([])
   const [error, setError] = useState(null)
   const [filterType, setFilterType] = useState(null)
@@ -99,6 +100,10 @@ function CalendarPage() {
   }, [])
 
   const handleDateClick = (info) => {
+    if (!isAuthenticated) {
+      alert('Connectez-vous pour créer un événement.')
+      return
+    }
     const start = `${info.dateStr}T08:00`
     const end = `${info.dateStr}T09:00`
     setFormData({ ...defaultFormData, startDate: start, endDate: end })
@@ -106,6 +111,10 @@ function CalendarPage() {
   }
 
   const handleSelectRange = (info) => {
+    if (!isAuthenticated) {
+      alert('Connectez-vous pour créer un événement.')
+      return
+    }
     const startDate = formatDateForInput(info.startStr)
     const endDate = formatEndDateForInput(info.endStr)
     setFormData({ ...defaultFormData, startDate, endDate })
@@ -115,6 +124,10 @@ function CalendarPage() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault()
+    if (!isAuthenticated) {
+      alert('Connexion requise pour créer un événement.')
+      return
+    }
     try {
       const payload = {
         title: formData.title,
@@ -160,6 +173,7 @@ function CalendarPage() {
   }
 
   const handleEventDrop = async (info) => {
+    if (!isAuthenticated) return
     try {
       const updated = await persistEventChange(info.event)
       setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
@@ -171,6 +185,7 @@ function CalendarPage() {
   }
 
   const handleEventResize = async (info) => {
+    if (!isAuthenticated) return
     try {
       const updated = await persistEventChange(info.event)
       setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
@@ -198,6 +213,7 @@ function CalendarPage() {
   const handleUpdateEvent = async (e) => {
     e.preventDefault()
     if (!selectedEvent) return
+    if (!isAuthenticated) return
 
     try {
       const payload = {
@@ -222,6 +238,7 @@ function CalendarPage() {
 
   const handleDeleteEvent = async () => {
     if (!selectedEvent) return
+    if (!isAuthenticated) return
 
     try {
       await eventService.delete(selectedEvent.id)
@@ -261,24 +278,48 @@ function CalendarPage() {
                   👤 Connecté en tant que : <strong>{user.firstName} {user.lastName}</strong>
                 </p>
               )}
+              {!isAuthenticated && (
+                <p style={{ margin: '12px 0 0 0', fontSize: '0.9em', opacity: 0.9 }}>
+                  Accès public en lecture seule. Connectez-vous pour créer ou modifier des événements.
+                </p>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={logout}
-              style={{
-                marginLeft: 'auto',
-                padding: '12px 18px',
-                background: 'rgba(255,255,255,0.15)',
-                color: 'white',
-                border: '2px solid rgba(255,255,255,0.35)',
-                borderRadius: '10px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                backdropFilter: 'blur(4px)'
-              }}
-            >
-              ↩ Se déconnecter
-            </button>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={logout}
+                style={{
+                  marginLeft: 'auto',
+                  padding: '12px 18px',
+                  background: 'rgba(255,255,255,0.15)',
+                  color: 'white',
+                  border: '2px solid rgba(255,255,255,0.35)',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(4px)'
+                }}
+              >
+                ↩ Se déconnecter
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                style={{
+                  marginLeft: 'auto',
+                  padding: '12px 18px',
+                  background: 'rgba(255,255,255,0.15)',
+                  color: 'white',
+                  border: '2px solid rgba(255,255,255,0.35)',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  backdropFilter: 'blur(4px)'
+                }}
+              >
+                Se connecter
+              </Link>
+            )}
           </div>
         </div>
 
@@ -375,13 +416,13 @@ function CalendarPage() {
               right: 'dayGridMonth,timeGridWeek,timeGridDay'
             }}
             events={calendarEvents}
-            dateClick={handleDateClick}
-            select={handleSelectRange}
+            dateClick={isAuthenticated ? handleDateClick : undefined}
+            select={isAuthenticated ? handleSelectRange : undefined}
             eventClick={handleEventClick}
-            eventDrop={handleEventDrop}
-            eventResize={handleEventResize}
-            editable={true}
-            selectable={true}
+            eventDrop={isAuthenticated ? handleEventDrop : undefined}
+            eventResize={isAuthenticated ? handleEventResize : undefined}
+            editable={isAuthenticated}
+            selectable={isAuthenticated}
             selectMirror={true}
             dayMaxEvents={true}
             weekends={true}
@@ -406,7 +447,7 @@ function CalendarPage() {
             color: '#666'
           }}>
             <p style={{ margin: '5px 0' }}>
-              💡 <strong>Astuce:</strong> Cliquez sur une date pour ajouter un événement
+              💡 <strong>Astuce:</strong> Connectez-vous puis cliquez sur une date pour ajouter un événement
             </p>
             <p style={{ margin: '5px 0' }}>
               👁️ <strong>Détails:</strong> Cliquez sur un événement pour voir ses détails
@@ -414,6 +455,11 @@ function CalendarPage() {
             <p style={{ margin: '5px 0' }}>
               ✅ <strong>Statut:</strong> {events.length} événement{events.length > 1 ? 's' : ''} chargé{events.length > 1 ? 's' : ''} depuis Symfony
             </p>
+            {!isAuthenticated && (
+              <p style={{ margin: '5px 0' }}>
+                🔒 Vous êtes en lecture seule. Connectez-vous pour créer, déplacer ou supprimer des événements.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -934,44 +980,52 @@ function CalendarPage() {
                 >
                   Fermer
                 </button>
-                <button
-                  type="button"
-                  onClick={handleEditEvent}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#0d6efd',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = '#0b5ed7')}
-                  onMouseOut={(e) => (e.target.style.background = '#0d6efd')}
-                >
-                  ✏️ Modifier
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteEvent}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#dc3545',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = '#c82333')}
-                  onMouseOut={(e) => (e.target.style.background = '#dc3545')}
-                >
-                  🗑️ Supprimer
-                </button>
+                {isAuthenticated ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleEditEvent}
+                      style={{
+                        padding: '12px 24px',
+                        background: '#0d6efd',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => (e.target.style.background = '#0b5ed7')}
+                      onMouseOut={(e) => (e.target.style.background = '#0d6efd')}
+                    >
+                      ✏️ Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteEvent}
+                      style={{
+                        padding: '12px 24px',
+                        background: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => (e.target.style.background = '#c82333')}
+                      onMouseOut={(e) => (e.target.style.background = '#dc3545')}
+                    >
+                      🗑️ Supprimer
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ alignSelf: 'center', color: '#6c757d', fontWeight: 600 }}>
+                    Connectez-vous pour modifier ou supprimer cet événement.
+                  </span>
+                )}
               </div>
             </div>
           </div>
