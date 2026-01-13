@@ -1,6 +1,9 @@
 -- Schéma MySQL pour import phpMyAdmin
 -- Base suggérée : agenda (MySQL 8.0, utf8mb4)
 -- Crée les tables principales utilisées par l'app (events + relations basiques)
+drop database if exists agenda_db;
+create database agenda_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+use agenda_db;
 
 CREATE TABLE IF NOT EXISTS users (
   id_user INT AUTO_INCREMENT PRIMARY KEY,
