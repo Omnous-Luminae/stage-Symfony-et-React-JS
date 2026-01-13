@@ -9,15 +9,16 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: CalendarPermissionRepository::class)]
 #[ORM\Table(name: 'calendar_permissions')]
 #[ORM\UniqueConstraint(name: 'unique_calendar_user', columns: ['calendar_id', 'user_id'])]
+#[ORM\UniqueConstraint(name: 'unique_calendar_role', columns: ['calendar_id', 'role_name'])]
 class CalendarPermission
 {
-    public const PERMISSION_VIEW = 'view';
-    public const PERMISSION_EDIT = 'edit';
-    public const PERMISSION_ADMIN = 'admin';
+    public const PERMISSION_CONSULTATION = 'Consultation';
+    public const PERMISSION_MODIFICATION = 'Modification';
+    public const PERMISSION_ADMINISTRATION = 'Administration';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\Column(name: 'id_c_perm')]
     #[Groups(['permission:read'])]
     private ?int $id = null;
 
@@ -27,21 +28,30 @@ class CalendarPermission
     private ?Calendar $calendar = null;
 
     #[ORM\ManyToOne(inversedBy: 'calendarPermissions')]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['permission:read', 'calendar:detail'])]
     private ?User $user = null;
 
-    #[ORM\Column(length: 50)]
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(['permission:read', 'permission:write'])]
+    private ?string $roleName = null;
+
+    #[ORM\Column(type: 'string', length: 50)]
     #[Groups(['permission:read', 'permission:write', 'calendar:detail'])]
     private ?string $permission = null;
 
-    #[ORM\Column]
+    #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['permission:read'])]
-    private ?\DateTimeImmutable $grantedAt = null;
+    private ?\DateTimeImmutable $createdAt = null;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    #[Groups(['permission:read'])]
+    private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
     {
-        $this->grantedAt = new \DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -73,6 +83,18 @@ class CalendarPermission
         return $this;
     }
 
+    public function getRoleName(): ?string
+    {
+        return $this->roleName;
+    }
+
+    public function setRoleName(?string $roleName): static
+    {
+        $this->roleName = $roleName;
+
+        return $this;
+    }
+
     public function getPermission(): ?string
     {
         return $this->permission;
@@ -81,9 +103,9 @@ class CalendarPermission
     public function setPermission(string $permission): static
     {
         $validPermissions = [
-            self::PERMISSION_VIEW,
-            self::PERMISSION_EDIT,
-            self::PERMISSION_ADMIN
+            self::PERMISSION_CONSULTATION,
+            self::PERMISSION_MODIFICATION,
+            self::PERMISSION_ADMINISTRATION
         ];
 
         if (!in_array($permission, $validPermissions)) {
@@ -95,14 +117,26 @@ class CalendarPermission
         return $this;
     }
 
-    public function getGrantedAt(): ?\DateTimeImmutable
+    public function getCreatedAt(): ?\DateTimeImmutable
     {
-        return $this->grantedAt;
+        return $this->createdAt;
     }
 
-    public function setGrantedAt(\DateTimeImmutable $grantedAt): static
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
     {
-        $this->grantedAt = $grantedAt;
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
@@ -110,22 +144,22 @@ class CalendarPermission
     public function canView(): bool
     {
         return in_array($this->permission, [
-            self::PERMISSION_VIEW,
-            self::PERMISSION_EDIT,
-            self::PERMISSION_ADMIN
+            self::PERMISSION_CONSULTATION,
+            self::PERMISSION_MODIFICATION,
+            self::PERMISSION_ADMINISTRATION
         ]);
     }
 
     public function canEdit(): bool
     {
         return in_array($this->permission, [
-            self::PERMISSION_EDIT,
-            self::PERMISSION_ADMIN
+            self::PERMISSION_MODIFICATION,
+            self::PERMISSION_ADMINISTRATION
         ]);
     }
 
     public function canAdmin(): bool
     {
-        return $this->permission === self::PERMISSION_ADMIN;
+        return $this->permission === self::PERMISSION_ADMINISTRATION;
     }
 }

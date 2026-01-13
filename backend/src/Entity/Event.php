@@ -12,16 +12,16 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\HasLifecycleCallbacks]
 class Event
 {
-    public const TYPE_COURSE = 'course';
-    public const TYPE_MEETING = 'meeting';
-    public const TYPE_EXAM = 'exam';
-    public const TYPE_ADMINISTRATIVE = 'administrative';
-    public const TYPE_TRAINING = 'training';
-    public const TYPE_OTHER = 'other';
+    public const TYPE_COURSE = 'Cours';
+    public const TYPE_MEETING = 'Réunion';
+    public const TYPE_EXAM = 'Examen';
+    public const TYPE_ADMINISTRATIVE = 'Administratif';
+    public const TYPE_TRAINING = 'Formation';
+    public const TYPE_OTHER = 'Autre';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\Column(name: 'id_events')]
     #[Groups(['event:read'])]
     private ?int $id = null;
 
@@ -45,7 +45,7 @@ class Event
     #[Groups(['event:read', 'event:write'])]
     private ?string $location = null;
 
-    #[ORM\Column(length: 50)]
+    #[ORM\Column(type: 'string', length: 50)]
     #[Groups(['event:read', 'event:write'])]
     private ?string $type = null;
 
@@ -57,17 +57,25 @@ class Event
     #[Groups(['event:read', 'event:write'])]
     private ?bool $isRecurrent = false;
 
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
+    #[Groups(['event:read', 'event:write'])]
+    private ?string $recurrenceType = null;
+
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['event:read', 'event:write'])]
     private ?array $recurrencePattern = null;
 
+    #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
+    #[Groups(['event:read', 'event:write'])]
+    private ?\DateTimeInterface $recurrenceEndDate = null;
+
     #[ORM\ManyToOne(inversedBy: 'events')]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['event:read'])]
     private ?Calendar $calendar = null;
 
     #[ORM\ManyToOne(inversedBy: 'createdEvents')]
-    #[ORM\JoinColumn(nullable: true)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['event:read'])]
     private ?User $createdBy = null;
 
@@ -205,6 +213,21 @@ class Event
         return $this;
     }
 
+    public function getRecurrenceType(): ?string
+    {
+        return $this->recurrenceType;
+    }
+
+    public function setRecurrenceType(?string $recurrenceType): static
+    {
+        if ($recurrenceType && !in_array($recurrenceType, ['Quotidien', 'Hebdomadaire', 'Mensuel'])) {
+            throw new \InvalidArgumentException('Invalid recurrence type');
+        }
+        $this->recurrenceType = $recurrenceType;
+
+        return $this;
+    }
+
     public function getRecurrencePattern(): ?array
     {
         return $this->recurrencePattern;
@@ -213,6 +236,18 @@ class Event
     public function setRecurrencePattern(?array $recurrencePattern): static
     {
         $this->recurrencePattern = $recurrencePattern;
+
+        return $this;
+    }
+
+    public function getRecurrenceEndDate(): ?\DateTimeInterface
+    {
+        return $this->recurrenceEndDate;
+    }
+
+    public function setRecurrenceEndDate(?\DateTimeInterface $recurrenceEndDate): static
+    {
+        $this->recurrenceEndDate = $recurrenceEndDate;
 
         return $this;
     }

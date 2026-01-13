@@ -1,9 +1,7 @@
 -- Schéma MySQL pour import phpMyAdmin
 -- Base suggérée : agenda (MySQL 8.0, utf8mb4)
 -- Crée les tables principales utilisées par l'app (events + relations basiques)
-drop database if exists agenda_db;
-create database agenda_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-use agenda_db;
+
 
 CREATE TABLE IF NOT EXISTS users (
   id_user INT AUTO_INCREMENT PRIMARY KEY,
@@ -179,3 +177,11 @@ CREATE TABLE IF NOT EXISTS teacher_class (
   UNIQUE KEY uniq_teacher_class (user_id, class_id),
   INDEX idx_class_id (class_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Données de test
+INSERT INTO users (id_user, first_name, last_name, email, role, roles, password, status, created_at, updated_at) 
+VALUES (1, 'Jean', 'Dupont', 'j.dupont@lycee.fr', 'Professeur', '["ROLE_PROFESSOR"]', '$2y$13$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUmmS46m', 'Actif', NOW(), NOW());
+
+-- Créer un agenda personnel pour l'utilisateur
+INSERT INTO calendars (id_calendar, name, color, created_by_id, created_at, updated_at) 
+VALUES (1, 'Mon Agenda Personnel', '#3788d8', 1, NOW(), NOW());

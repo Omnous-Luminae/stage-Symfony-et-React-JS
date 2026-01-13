@@ -16,22 +16,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column]
+    #[ORM\Column(name: 'id_user')]
     #[Groups(['user:read', 'calendar:read', 'event:read'])]
     private ?int $id = null;
-
-    #[ORM\Column(length: 180, unique: true)]
-    #[Groups(['user:read', 'user:write'])]
-    private ?string $email = null;
-
-    #[ORM\Column]
-    private array $roles = [];
-
-    /**
-     * @var string The hashed password
-     */
-    #[ORM\Column]
-    private ?string $password = null;
 
     #[ORM\Column(length: 100)]
     #[Groups(['user:read', 'user:write', 'calendar:read', 'event:read'])]
@@ -41,11 +28,38 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write', 'calendar:read', 'event:read'])]
     private ?string $lastName = null;
 
+    #[ORM\Column(length: 180, unique: true)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $email = null;
+
+    #[ORM\Column(type: 'string', length: 50)]
+    #[Groups(['user:read'])]
+    private string $role = 'Intervenant';
+
+    #[ORM\Column(type: 'json')]
+    private array $roles = [];
+
+    /**
+     * @var string The hashed password
+     */
     #[ORM\Column]
+    private ?string $password = null;
+
+    #[ORM\Column(type: 'string', length: 10)]
+    #[Groups(['user:read'])]
+    private string $status = 'Actif';
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastPasswordChange = null;
+
+    #[ORM\Column(type: 'boolean')]
+    private bool $rememberMe = false;
+
+    #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['user:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
-    #[ORM\Column]
+    #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['user:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
@@ -65,11 +79,43 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->calendarPermissions = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+        $this->role = 'Intervenant';
+        $this->status = 'Actif';
+        $this->rememberMe = false;
     }
 
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getFirstName(): ?string
+    {
+        return $this->firstName;
+    }
+
+    public function setFirstName(string $firstName): static
+    {
+        $this->firstName = $firstName;
+
+        return $this;
+    }
+
+    public function getLastName(): ?string
+    {
+        return $this->lastName;
+    }
+
+    public function setLastName(string $lastName): static
+    {
+        $this->lastName = $lastName;
+
+        return $this;
+    }
+
+    public function getFullName(): string
+    {
+        return $this->firstName . ' ' . $this->lastName;
     }
 
     public function getEmail(): ?string
@@ -80,6 +126,84 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmail(string $email): static
     {
         $this->email = $email;
+
+        return $this;
+    }
+
+    public function getRole(): string
+    {
+        return $this->role;
+    }
+
+    public function setRole(string $role): static
+    {
+        if (!in_array($role, ['Élève', 'Professeur', 'Personnel', 'Intervenant'])) {
+            throw new \InvalidArgumentException('Invalid role');
+        }
+        $this->role = $role;
+
+        return $this;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): static
+    {
+        if (!in_array($status, ['Actif', 'Inactif'])) {
+            throw new \InvalidArgumentException('Invalid status');
+        }
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function getLastPasswordChange(): ?\DateTimeImmutable
+    {
+        return $this->lastPasswordChange;
+    }
+
+    public function setLastPasswordChange(?\DateTimeImmutable $lastPasswordChange): static
+    {
+        $this->lastPasswordChange = $lastPasswordChange;
+
+        return $this;
+    }
+
+    public function isRememberMe(): bool
+    {
+        return $this->rememberMe;
+    }
+
+    public function setRememberMe(bool $rememberMe): static
+    {
+        $this->rememberMe = $rememberMe;
+
+        return $this;
+    }
+
+    public function getCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
@@ -135,59 +259,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         // If you store any temporary, sensitive data on the user, clear it here
         // $this->plainPassword = null;
-    }
-
-    public function getFirstName(): ?string
-    {
-        return $this->firstName;
-    }
-
-    public function setFirstName(string $firstName): static
-    {
-        $this->firstName = $firstName;
-
-        return $this;
-    }
-
-    public function getLastName(): ?string
-    {
-        return $this->lastName;
-    }
-
-    public function setLastName(string $lastName): static
-    {
-        $this->lastName = $lastName;
-
-        return $this;
-    }
-
-    public function getFullName(): string
-    {
-        return $this->firstName . ' ' . $this->lastName;
-    }
-
-    public function getCreatedAt(): ?\DateTimeImmutable
-    {
-        return $this->createdAt;
-    }
-
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
-    {
-        $this->createdAt = $createdAt;
-
-        return $this;
-    }
-
-    public function getUpdatedAt(): ?\DateTimeImmutable
-    {
-        return $this->updatedAt;
-    }
-
-    public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
-    {
-        $this->updatedAt = $updatedAt;
-
-        return $this;
     }
 
     /**
