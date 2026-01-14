@@ -20,7 +20,7 @@ class Calendar
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(name: 'id_calendar')]
+    #[ORM\Column(name: 'id_calendar', type: Types::INTEGER)]
     #[Groups(['calendar:read', 'event:read'])]
     private ?int $id = null;
 
@@ -41,7 +41,7 @@ class Calendar
     private ?string $color = '#3788d8';
 
     #[ORM\ManyToOne(inversedBy: 'ownedCalendars')]
-    #[ORM\JoinColumn(name: 'created_by_id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'created_by_id', referencedColumnName: 'id_user', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['calendar:read'])]
     private ?User $owner = null;
 

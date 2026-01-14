@@ -21,7 +21,7 @@ class Event
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(name: 'id_events')]
+    #[ORM\Column(name: 'id_events', type: Types::INTEGER)]
     #[Groups(['event:read'])]
     private ?int $id = null;
 
@@ -70,12 +70,12 @@ class Event
     private ?\DateTimeInterface $recurrenceEndDate = null;
 
     #[ORM\ManyToOne(inversedBy: 'events')]
-    #[ORM\JoinColumn(name: 'calendar_id', nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'calendar_id', referencedColumnName: 'id_calendar', nullable: true, onDelete: 'CASCADE')]
     #[Groups(['event:read'])]
     private ?Calendar $calendar = null;
 
     #[ORM\ManyToOne(inversedBy: 'createdEvents')]
-    #[ORM\JoinColumn(name: 'created_by_id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'created_by_id', referencedColumnName: 'id_user', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['event:read'])]
     private ?User $createdBy = null;
 

@@ -185,3 +185,7 @@ VALUES (1, 'Jean', 'Dupont', 'j.dupont@lycee.fr', 'Professeur', '["ROLE_PROFESSO
 -- Créer un agenda personnel pour l'utilisateur
 INSERT INTO calendars (id_calendar, name, color, created_by_id, created_at, updated_at) 
 VALUES (1, 'Mon Agenda Personnel', '#3788d8', 1, NOW(), NOW());
+
+
+insert into users (id_user, first_name, last_name, email, role, roles, password, status, created_at, updated_at) 
+VALUES (2, 'Ethan', 'Enjolras', 'enjolras.ethan3@gmail.com', 'Intervenant', '["ROLE_INTERVENANT"]', '$2y$10$q0VzATxurLiVLIhTAXAaSeDRfCamKmkKj/Igm8UpKvMHfk.5ArEU6', 'Actif', NOW(), NOW());

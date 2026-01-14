@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\CalendarPermissionRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
@@ -18,17 +19,17 @@ class CalendarPermission
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(name: 'id_c_perm')]
+    #[ORM\Column(name: 'id_c_perm', type: Types::INTEGER)]
     #[Groups(['permission:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'permissions')]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'calendar_id', referencedColumnName: 'id_calendar', nullable: false, onDelete: 'CASCADE')]
     #[Groups(['permission:read'])]
     private ?Calendar $calendar = null;
 
     #[ORM\ManyToOne(inversedBy: 'calendarPermissions')]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id_user', nullable: true, onDelete: 'CASCADE')]
     #[Groups(['permission:read', 'calendar:detail'])]
     private ?User $user = null;
 

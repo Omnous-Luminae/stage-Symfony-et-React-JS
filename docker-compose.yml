@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  mysql:
+    image: mariadb:10.11
+    container_name: stage_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password_secure}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agenda_db}
+      MYSQL_USER: ${MYSQL_USER:-agenda_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-agenda_pass_secure}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/sql:/docker-entrypoint-initdb.d
+    networks:
+      - stage_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password_secure}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PHPMyAdmin
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: stage_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-agenda_user}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-agenda_pass_secure}
+      UPLOAD_LIMIT: 100M
+    ports:
+      - "${PHPMYADMIN_PORT:-8080}:80"
+    networks:
+      - stage_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Backend Symfony
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: stage_backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_SECRET: ${APP_SECRET:-your_secret_key_here}
+      DATABASE_URL: "mysql://${MYSQL_USER:-agenda_user}:${MYSQL_PASSWORD:-agenda_pass_secure}@mysql:3306/${MYSQL_DATABASE:-agenda_db}?serverVersion=8.0"
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-http://localhost:5173}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-%kernel.project_dir%/config/jwt/private.pem}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-%kernel.project_dir%/config/jwt/public.pem}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:-your_jwt_passphrase}
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+    ports:
+      - "${BACKEND_PORT:-8000}:80"
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+      - backend_var:/var/www/html/var
+    networks:
+      - stage_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: stage_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    networks:
+      - stage_network
+    depends_on:
+      - backend
+    command: npm run dev -- --host
+
+networks:
+  stage_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  backend_vendor:
+    driver: local
+  backend_var:
+    driver: local
+  frontend_node_modules:
+    driver: local

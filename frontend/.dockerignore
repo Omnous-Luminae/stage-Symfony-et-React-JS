@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+/node_modules/
+
+# Build output
+dist/
+/dist/
+build/
+
+# Cache
+.cache/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.iml
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+coverage/
+.nyc_output/
+
+# Package manager
+yarn.lock
+package-lock.json
+pnpm-lock.yaml

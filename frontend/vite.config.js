@@ -6,11 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: true,
+    host: '0.0.0.0',
     proxy: {
       '/api': {
-        // Dans Docker, on utilise le nom du service nginx qui expose le backend
-        target: 'http://nginx:80',
+        // Dans Docker, on utilise le nom du service backend du docker-compose
+        target: 'http://backend:80',
         changeOrigin: true,
         // ensure proper path pass-through to PHP server
         rewrite: (path) => path,

@@ -1,0 +1,45 @@
+# Cache et logs
+/var/
+var/
+
+# Vendor
+/vendor/
+vendor/
+
+# Configuration locale
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+/tests/
+tests/
+
+# Documentation
+*.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Node modules (si présents)
+node_modules/
+
+# Public assets générés
+/public/bundles/
+/public/assets/
