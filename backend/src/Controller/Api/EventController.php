@@ -21,6 +21,26 @@ class EventController extends AbstractController
     private const COLOR_RED = '#f44336';
     private const COLOR_ORANGE = '#ff9800';
 
+    // Mapping des types frontend -> backend
+    private const TYPE_MAPPING = [
+        'course' => 'Cours',
+        'meeting' => 'Réunion',
+        'exam' => 'Examen',
+        'administrative' => 'Administratif',
+        'training' => 'Formation',
+        'other' => 'Autre'
+    ];
+
+    // Mapping inverse backend -> frontend
+    private const TYPE_MAPPING_REVERSE = [
+        'Cours' => 'course',
+        'Réunion' => 'meeting',
+        'Examen' => 'exam',
+        'Administratif' => 'administrative',
+        'Formation' => 'training',
+        'Autre' => 'other'
+    ];
+
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(): JsonResponse
     {
@@ -79,7 +99,11 @@ class EventController extends AbstractController
             }
             $event->setEndDate($endDate);
             
-            $event->setType($data['type'] ?? 'other');
+            // Mapper le type frontend -> backend
+            $frontendType = $data['type'] ?? 'other';
+            $backendType = self::TYPE_MAPPING[$frontendType] ?? 'Autre';
+            $event->setType($backendType);
+            
             $event->setLocation($data['location'] ?? '');
             $event->setDescription($data['description'] ?? '');
             
@@ -94,7 +118,7 @@ class EventController extends AbstractController
                     return $this->json(['error' => 'Calendar not found'], 404);
                 }
             } else {
-                // Événement général, utiliser la couleur basée sur le type
+                // Événement général, utiliser la couleur basée sur le type (frontend)
                 $colorMap = [
                     'course' => self::COLOR_BLUE,
                     'meeting' => self::COLOR_GREEN,
@@ -102,7 +126,7 @@ class EventController extends AbstractController
                     'training' => self::COLOR_ORANGE,
                     'other' => '#9c27b0'
                 ];
-                $event->setColor($colorMap[$event->getType()] ?? self::COLOR_BLUE);
+                $event->setColor($colorMap[$frontendType] ?? self::COLOR_BLUE);
             }
 
             // Persister l'événement
@@ -163,17 +187,11 @@ class EventController extends AbstractController
                 $event->setEndDate($endDate);
             }
             if (isset($data['type'])) {
-                $event->setType($data['type']);
-            }
-            if (isset($data['location'])) {
-                $event->setLocation($data['location']);
-            }
-            if (isset($data['description'])) {
-                $event->setDescription($data['description']);
-            }
-
-            // Mettre à jour la couleur basée sur le type si le type a changé
-            if (isset($data['type'])) {
+                $frontendType = $data['type'];
+                $backendType = self::TYPE_MAPPING[$frontendType] ?? 'Autre';
+                $event->setType($backendType);
+                
+                // Mettre à jour la couleur basée sur le type (frontend)
                 $colorMap = [
                     'course' => self::COLOR_BLUE,
                     'meeting' => self::COLOR_GREEN,
@@ -181,7 +199,13 @@ class EventController extends AbstractController
                     'training' => self::COLOR_ORANGE,
                     'other' => '#9c27b0'
                 ];
-                $event->setColor($colorMap[$event->getType()] ?? self::COLOR_BLUE);
+                $event->setColor($colorMap[$frontendType] ?? self::COLOR_BLUE);
+            }
+            if (isset($data['location'])) {
+                $event->setLocation($data['location']);
+            }
+            if (isset($data['description'])) {
+                $event->setDescription($data['description']);
             }
 
             // Persister les modifications
@@ -212,6 +236,10 @@ class EventController extends AbstractController
         
         $calendar = $event->getCalendar();
         
+        // Convertir le type backend -> frontend
+        $backendType = $event->getType();
+        $frontendType = self::TYPE_MAPPING_REVERSE[$backendType] ?? 'other';
+        
         return [
             'id' => $event->getId(),
             'title' => $event->getTitle(),
@@ -220,7 +248,7 @@ class EventController extends AbstractController
             'backgroundColor' => $event->getColor(),
             'borderColor' => $event->getColor(),
             'extendedProps' => [
-                'type' => $event->getType(),
+                'type' => $frontendType,
                 'location' => $event->getLocation(),
                 'description' => $event->getDescription(),
                 'calendarId' => $calendar ? $calendar->getId() : null,

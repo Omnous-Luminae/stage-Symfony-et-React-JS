@@ -45,6 +45,7 @@ RUN pecl install xdebug \
 # Configuration PHP
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY docker/php/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+COPY docker/php/php-fpm-pool.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
