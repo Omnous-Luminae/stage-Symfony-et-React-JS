@@ -15,8 +15,8 @@ security:
         main:
             lazy: true
             provider: app_user_provider
-            # stateless API; rely on custom controllers for now
-            stateless: true
+            # Enable sessions for session-based authentication
+            stateless: false
 
             # activate different ways to authenticate
             # https://symfony.com/doc/current/security.html#the-firewall

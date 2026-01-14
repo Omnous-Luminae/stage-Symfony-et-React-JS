@@ -52,11 +52,11 @@ class Calendar
     #[Groups(['calendar:detail'])]
     private Collection $permissions;
 
-    #[ORM\Column]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     #[Groups(['calendar:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
-    #[ORM\Column]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     #[Groups(['calendar:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 

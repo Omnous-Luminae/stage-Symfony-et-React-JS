@@ -70,20 +70,20 @@ class Event
     private ?\DateTimeInterface $recurrenceEndDate = null;
 
     #[ORM\ManyToOne(inversedBy: 'events')]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'calendar_id', nullable: true, onDelete: 'CASCADE')]
     #[Groups(['event:read'])]
     private ?Calendar $calendar = null;
 
     #[ORM\ManyToOne(inversedBy: 'createdEvents')]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'created_by_id', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['event:read'])]
     private ?User $createdBy = null;
 
-    #[ORM\Column]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     #[Groups(['event:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
-    #[ORM\Column]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     #[Groups(['event:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 

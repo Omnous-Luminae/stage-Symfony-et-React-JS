@@ -96,7 +96,10 @@ function CalendarPage() {
   }
 
   useEffect(() => {
-    loadEvents()
+    const init = async () => {
+      await loadEvents()
+    }
+    init()
   }, [])
 
   const handleDateClick = (info) => {
