@@ -79,7 +79,7 @@ class EventController extends AbstractController
             }
             $event->setEndDate($endDate);
             
-            $event->setType($this->mapType($data['type'] ?? 'other'));
+            $event->setType($data['type'] ?? 'other');
             $event->setLocation($data['location'] ?? '');
             $event->setDescription($data['description'] ?? '');
             
@@ -96,12 +96,11 @@ class EventController extends AbstractController
             } else {
                 // Événement général, utiliser la couleur basée sur le type
                 $colorMap = [
-                    Event::TYPE_COURSE => self::COLOR_BLUE,
-                    Event::TYPE_MEETING => self::COLOR_GREEN,
-                    Event::TYPE_EXAM => self::COLOR_RED,
-                    Event::TYPE_TRAINING => self::COLOR_ORANGE,
-                    Event::TYPE_ADMINISTRATIVE => '#9c27b0',
-                    Event::TYPE_OTHER => '#9c27b0',
+                    'course' => self::COLOR_BLUE,
+                    'meeting' => self::COLOR_GREEN,
+                    'exam' => self::COLOR_RED,
+                    'training' => self::COLOR_ORANGE,
+                    'other' => '#9c27b0'
                 ];
                 $event->setColor($colorMap[$event->getType()] ?? self::COLOR_BLUE);
             }
@@ -164,7 +163,7 @@ class EventController extends AbstractController
                 $event->setEndDate($endDate);
             }
             if (isset($data['type'])) {
-                $event->setType($this->mapType($data['type']));
+                $event->setType($data['type']);
             }
             if (isset($data['location'])) {
                 $event->setLocation($data['location']);
@@ -176,12 +175,11 @@ class EventController extends AbstractController
             // Mettre à jour la couleur basée sur le type si le type a changé
             if (isset($data['type'])) {
                 $colorMap = [
-                    Event::TYPE_COURSE => self::COLOR_BLUE,
-                    Event::TYPE_MEETING => self::COLOR_GREEN,
-                    Event::TYPE_EXAM => self::COLOR_RED,
-                    Event::TYPE_TRAINING => self::COLOR_ORANGE,
-                    Event::TYPE_ADMINISTRATIVE => '#9c27b0',
-                    Event::TYPE_OTHER => '#9c27b0',
+                    'course' => self::COLOR_BLUE,
+                    'meeting' => self::COLOR_GREEN,
+                    'exam' => self::COLOR_RED,
+                    'training' => self::COLOR_ORANGE,
+                    'other' => '#9c27b0'
                 ];
                 $event->setColor($colorMap[$event->getType()] ?? self::COLOR_BLUE);
             }
@@ -229,22 +227,6 @@ class EventController extends AbstractController
                 'calendarName' => $calendar ? $calendar->getName() : 'Événement général'
             ]
         ];
-    }
-
-    /**
-     * Normalise le type reçu du front (en) vers les valeurs attendues par l'Entity/BDD (fr)
-     */
-    private function mapType(string $rawType): string
-    {
-        $normalized = strtolower(trim($rawType));
-        return match ($normalized) {
-            'course', 'cours' => Event::TYPE_COURSE,
-            'meeting', 'reunion', 'réunion' => Event::TYPE_MEETING,
-            'exam', 'examen' => Event::TYPE_EXAM,
-            'training', 'formation' => Event::TYPE_TRAINING,
-            'administratif', 'administrative' => Event::TYPE_ADMINISTRATIVE,
-            default => Event::TYPE_OTHER,
-        };
     }
 
     #[Route('/calendars', name: 'calendars_list', methods: ['GET'])]
