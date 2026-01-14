@@ -11,6 +11,8 @@ export default defineConfig({
       '/api': {
         // Dans Docker, on utilise le nom du service backend du docker-compose
         target: 'http://backend:80',
+        // On réécrit le domaine des cookies vers localhost pour que le navigateur les garde
+        cookieDomainRewrite: 'localhost',
         changeOrigin: true,
         // ensure proper path pass-through to PHP server
         rewrite: (path) => path,
