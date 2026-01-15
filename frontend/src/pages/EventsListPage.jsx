@@ -19,13 +19,14 @@ function EventsListPage() {
   const [showModal, setShowModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
 
-  const eventTypes = [
-    { value: 'reunion', label: 'Réunion', icon: '👥', color: '#667eea' },
-    { value: 'rdv', label: 'Rendez-vous', icon: '📞', color: '#4facfe' },
-    { value: 'tache', label: 'Tâche', icon: '✅', color: '#43e97b' },
-    { value: 'personnel', label: 'Personnel', icon: '👤', color: '#fa709a' },
-    { value: 'autre', label: 'Autre', icon: '📌', color: '#fee140' }
-  ]
+  const eventTypes = {
+    'course': { label: 'Cours', icon: '📚', color: '#3788d8' },
+    'meeting': { label: 'Réunion', icon: '👥', color: '#4caf50' },
+    'exam': { label: 'Examen', icon: '📝', color: '#f44336' },
+    'administrative': { label: 'Administratif', icon: '📋', color: '#ff9800' },
+    'training': { label: 'Formation', icon: '🎓', color: '#9c27b0' },
+    'other': { label: 'Autre', icon: '📌', color: '#fee140' }
+  }
 
   useEffect(() => {
     loadEvents()
@@ -56,7 +57,7 @@ function EventsListPage() {
   }
 
   const getEventType = (type) => {
-    return eventTypes.find(t => t.value === type) || { label: type, icon: '📌', color: '#999' }
+    return eventTypes[type] || { label: type || 'Autre', icon: '📌', color: '#999' }
   }
 
   const filterEvents = () => {
@@ -243,7 +244,7 @@ function EventsListPage() {
 
             <div className="events-list">
               {filteredEvents.map((event) => {
-                const eventType = getEventType(event.type)
+                const eventType = getEventType(event.extendedProps?.type || event.type)
                 const startDate = new Date(event.start)
                 const endDate = new Date(event.end)
                 
@@ -272,13 +273,13 @@ function EventsListPage() {
                         </span>
                       </div>
 
-                      {event.description && (
-                        <div className="event-description">{event.description}</div>
+                      {event.extendedProps?.description && (
+                        <div className="event-description">{event.extendedProps.description}</div>
                       )}
 
-                      {event.location && (
+                      {event.extendedProps?.location && (
                         <div className="event-location">
-                          📍 {event.location}
+                          📍 {event.extendedProps.location}
                         </div>
                       )}
 
@@ -334,9 +335,9 @@ function EventsListPage() {
                   <label>Type:</label>
                   <span>
                     <span style={{ marginRight: '8px' }}>
-                      {getEventType(selectedEvent.type).icon}
+                      {getEventType(selectedEvent.extendedProps?.type || selectedEvent.type).icon}
                     </span>
-                    {getEventType(selectedEvent.type).label}
+                    {getEventType(selectedEvent.extendedProps?.type || selectedEvent.type).label}
                   </span>
                 </div>
 
@@ -347,10 +348,10 @@ function EventsListPage() {
                   </span>
                 </div>
 
-                {selectedEvent.location && (
+                {selectedEvent.extendedProps?.location && (
                   <div className="detail-row">
                     <label>Lieu:</label>
-                    <span>{selectedEvent.location}</span>
+                    <span>{selectedEvent.extendedProps.location}</span>
                   </div>
                 )}
 
@@ -362,17 +363,17 @@ function EventsListPage() {
                       width: '12px',
                       height: '12px',
                       borderRadius: '2px',
-                      backgroundColor: selectedEvent.calendar?.color || '#999',
+                      backgroundColor: selectedEvent.backgroundColor || '#999',
                       marginRight: '6px'
                     }}></span>
-                    {selectedEvent.calendar?.name || 'Sans agenda'}
+                    {selectedEvent.extendedProps?.calendarName || 'Sans agenda'}
                   </span>
                 </div>
 
-                {selectedEvent.description && (
+                {selectedEvent.extendedProps?.description && (
                   <div className="detail-row full-width">
                     <label>Description:</label>
-                    <p>{selectedEvent.description}</p>
+                    <p>{selectedEvent.extendedProps.description}</p>
                   </div>
                 )}
               </div>

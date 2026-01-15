@@ -7,7 +7,7 @@ import './AgendasPage.css'
 
 function AgendasPage() {
   const { user } = useAuth()
-  const { activeCalendar, selectCalendar } = useCalendar()
+  const { activeCalendar, selectCalendar, clearActiveCalendar } = useCalendar()
   const [calendars, setCalendars] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -131,7 +131,13 @@ function AgendasPage() {
                       <div className="agenda-actions">
                         <button 
                           className={`btn-primary ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
-                          onClick={() => selectCalendar(calendar)}
+                          onClick={() => {
+                            if (activeCalendar?.id === calendar.id) {
+                              clearActiveCalendar()
+                            } else {
+                              selectCalendar(calendar)
+                            }
+                          }}
                         >
                           {activeCalendar?.id === calendar.id ? '✅ Agenda actif' : '⭐ Utiliser'}
                         </button>
