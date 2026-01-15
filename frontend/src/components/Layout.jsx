@@ -64,10 +64,16 @@ function Layout({ children }) {
         {isAuthenticated && (
           <>
             <Link 
+              to="/home" 
+              className={isActive('/home') ? 'nav-link active' : 'nav-link'}
+            >
+              🏠 Accueil
+            </Link>
+            <Link 
               to="/dashboard" 
               className={isActive('/dashboard') ? 'nav-link active' : 'nav-link'}
             >
-              🏠 Tableau de Bord
+              📊 Tableau de Bord
             </Link>
             <Link 
               to="/agendas" 
@@ -84,6 +90,20 @@ function Layout({ children }) {
               </Link>
             )}
           </>
+        )}
+        <Link 
+          to="/about" 
+          className={isActive('/about') ? 'nav-link active' : 'nav-link'}
+        >
+          ℹ️ À propos
+        </Link>
+        {isAuthenticated && (
+          <Link 
+            to="/settings" 
+            className={isActive('/settings') ? 'nav-link active' : 'nav-link'}
+          >
+            ⚙️ Paramètres
+          </Link>
         )}
       </nav>
 

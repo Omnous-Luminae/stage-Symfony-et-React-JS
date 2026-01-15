@@ -1,0 +1,256 @@
+.event-alerts-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  gap: 20px;
+}
+
+.page-header h2 {
+  font-size: 28px;
+  color: #333;
+  margin: 0;
+}
+
+.event-datetime {
+  color: #666;
+  font-size: 14px;
+  margin: 8px 0 0 0;
+}
+
+.btn-secondary {
+  padding: 10px 16px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  color: #666;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.btn-secondary:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.alerts-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.add-alert-card,
+.alerts-list-card,
+.alert-info-card,
+.coming-soon-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.add-alert-card h3,
+.alerts-list-card h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #333;
+  font-size: 18px;
+}
+
+.alert-info-card h4,
+.coming-soon-card h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: #333;
+  font-size: 16px;
+}
+
+.add-alert-form {
+  display: flex;
+  gap: 12px;
+}
+
+.alert-select {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.alert-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+}
+
+.empty-alerts {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+  margin: 0;
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alert-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+  transition: all 0.2s;
+}
+
+.alert-item:hover {
+  background: #f0f3ff;
+}
+
+.alert-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alert-bell {
+  font-size: 18px;
+}
+
+.alert-label {
+  color: #333;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.btn-remove {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #999;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-remove:hover {
+  background: #fee;
+  color: #c33;
+}
+
+.alert-info-card,
+.coming-soon-card {
+  border-left: 4px solid;
+}
+
+.alert-info-card {
+  border-left-color: #667eea;
+  background: #f8f9ff;
+}
+
+.alert-info-card h4 {
+  color: #667eea;
+}
+
+.alert-info-card ul,
+.coming-soon-card ul {
+  margin: 0;
+  padding: 0 0 0 20px;
+  list-style: disc;
+}
+
+.alert-info-card li,
+.coming-soon-card li {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.coming-soon-card {
+  border-left-color: #43e97b;
+  background: #f0ffe7;
+}
+
+.coming-soon-card h4 {
+  color: #2d8659;
+}
+
+.coming-soon-card li {
+  color: #2d8659;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #c33;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .add-alert-form {
+    flex-direction: column;
+  }
+
+  .alerts-container {
+    gap: 16px;
+  }
+
+  .add-alert-card,
+  .alerts-list-card,
+  .alert-info-card,
+  .coming-soon-card {
+    padding: 16px;
+  }
+}
