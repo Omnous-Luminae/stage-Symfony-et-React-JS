@@ -7,6 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import Layout from '../components/Layout'
 import { eventService } from '../api/events'
 import { useAuth } from '../auth/AuthContext'
+import { useCalendar } from '../context/CalendarContext'
 import '../App.css'
 
 const typeColors = {
@@ -69,6 +70,7 @@ function mapApiEvent(event) {
 
 function CalendarPage() {
   const { logout, user, isAuthenticated } = useAuth()
+  const { activeCalendar } = useCalendar()
   const [events, setEvents] = useState([])
   const [error, setError] = useState(null)
   const [filterType, setFilterType] = useState(null)
@@ -78,9 +80,22 @@ function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [formData, setFormData] = useState(defaultFormData)
 
-  const filteredEvents = filterType
-    ? events.filter(evt => (evt.extendedProps?.type || evt.type) === filterType)
-    : events
+  // Filtrer par type ET par agenda actif
+  let filteredEvents = events
+  
+  // Filtrer par type si sélectionné
+  if (filterType) {
+    filteredEvents = filteredEvents.filter(evt => (evt.extendedProps?.type || evt.type) === filterType)
+  }
+  
+  // Filtrer par agenda actif si un agenda est sélectionné
+  if (activeCalendar) {
+    filteredEvents = filteredEvents.filter(evt => {
+      const eventCalendarId = evt.extendedProps?.calendarId
+      return eventCalendarId && eventCalendarId === activeCalendar.id
+    })
+  }
+  
   const calendarEvents = filteredEvents.map(evt => ({ ...evt }))
 
   const loadEvents = async () => {
