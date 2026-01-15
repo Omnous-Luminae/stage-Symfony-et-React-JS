@@ -40,13 +40,15 @@ function AgendasPage() {
   const handleCreateCalendar = async (e) => {
     e.preventDefault()
     try {
+      console.log('📤 Création agenda - payload:', newCalendar)
       await calendarService.create(newCalendar)
       setShowNewModal(false)
       setNewCalendar({ name: '', description: '', color: '#667eea' })
       await loadCalendars()
     } catch (err) {
-      setError('Erreur lors de la création de l\'agenda')
-      console.error(err)
+      const apiMessage = err?.response?.data?.error || err?.response?.data?.message
+      setError(apiMessage || 'Erreur lors de la création de l\'agenda')
+      console.error('❌ Création agenda échouée:', err?.response?.data || err)
     }
   }
 
