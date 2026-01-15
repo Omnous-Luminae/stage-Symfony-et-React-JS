@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../components/Layout'
-import { eventService } from '../api/events'
+import { useCalendar } from '../context/CalendarContext'
+import { eventService, calendarService } from '../api/events'
 import './EventsListPage.css'
 
 function EventsListPage() {
   console.log('🔍 EventsListPage MOUNTED!')
+  const { activeCalendar } = useCalendar()
   const [events, setEvents] = useState([])
+  const [calendars, setCalendars] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('all') // all, upcoming, past, today
+  const [filterCalendar, setFilterCalendar] = useState('') // Filtre par agenda
   const [sortBy, setSortBy] = useState('date') // date, title, calendar
   const [showModal, setShowModal] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -25,6 +29,7 @@ function EventsListPage() {
 
   useEffect(() => {
     loadEvents()
+    loadCalendars()
   }, [])
 
   const loadEvents = async () => {
@@ -41,6 +46,15 @@ function EventsListPage() {
     }
   }
 
+  const loadCalendars = async () => {
+    try {
+      const response = await calendarService.getAll()
+      setCalendars(response.data || [])
+    } catch (err) {
+      console.error('Erreur lors du chargement des agendas:', err)
+    }
+  }
+
   const getEventType = (type) => {
     return eventTypes.find(t => t.value === type) || { label: type, icon: '📌', color: '#999' }
   }
@@ -53,8 +67,16 @@ function EventsListPage() {
       filtered = filtered.filter(evt =>
         evt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         evt.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        evt.calendar?.name.toLowerCase().includes(searchTerm.toLowerCase())
+        evt.extendedProps?.calendarName?.toLowerCase().includes(searchTerm.toLowerCase())
       )
+    }
+
+    // Filtrer par agenda
+    if (filterCalendar) {
+      filtered = filtered.filter(evt => {
+        const calId = evt.extendedProps?.calendarId?.toString()
+        return calId === filterCalendar.toString()
+      })
     }
 
     // Filtrer par type de date
@@ -168,6 +190,19 @@ function EventsListPage() {
             </div>
 
             <div className="filter-group">
+              <label>Agenda:</label>
+              <select value={filterCalendar} onChange={(e) => setFilterCalendar(e.target.value)}>
+                <option value="">Tous les agendas</option>
+                <option value="">Sans agenda</option>
+                {calendars.map((cal) => (
+                  <option key={cal.id} value={cal.id}>
+                    {cal.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
               <label>Trier par:</label>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="date">Date</option>
@@ -175,6 +210,18 @@ function EventsListPage() {
                 <option value="calendar">Agenda</option>
               </select>
             </div>
+
+            <button 
+              className="btn-reset"
+              onClick={() => {
+                setSearchTerm('')
+                setFilterType('all')
+                setFilterCalendar('')
+                setSortBy('date')
+              }}
+            >
+              🔄 Réinitialiser
+            </button>
           </div>
         </div>
 
@@ -241,10 +288,10 @@ function EventsListPage() {
                           width: '12px',
                           height: '12px',
                           borderRadius: '2px',
-                          backgroundColor: event.calendar?.color || '#999',
+                          backgroundColor: event.backgroundColor || '#999',
                           marginRight: '6px'
                         }}></span>
-                        {event.calendar?.name || 'Sans agenda'}
+                        {event.extendedProps?.calendarName || 'Sans agenda'}
                       </div>
                     </div>
 

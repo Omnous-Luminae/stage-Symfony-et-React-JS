@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../auth/AuthContext'
+import { useCalendar } from '../context/CalendarContext'
 import { calendarService } from '../api/events'
 import './AgendasPage.css'
 
 function AgendasPage() {
   const { user } = useAuth()
+  const { activeCalendar, selectCalendar } = useCalendar()
   const [calendars, setCalendars] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -127,6 +129,12 @@ function AgendasPage() {
                         </div>
                       </div>
                       <div className="agenda-actions">
+                        <button 
+                          className={`btn-primary ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
+                          onClick={() => selectCalendar(calendar)}
+                        >
+                          {activeCalendar?.id === calendar.id ? '✅ Agenda actif' : '⭐ Utiliser'}
+                        </button>
                         <button className="btn-secondary" onClick={() => alert('Modifier: ' + calendar.name)}>✏️ Modifier</button>
                         <button className="btn-secondary" onClick={() => alert('Partager: ' + calendar.name)}>📤 Partager</button>
                         <button className="btn-danger" onClick={() => handleDeleteCalendar(calendar.id)}>🗑️</button>

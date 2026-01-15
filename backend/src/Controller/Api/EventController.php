@@ -110,12 +110,16 @@ class EventController extends AbstractController
             
             // Si calendarId est fourni, associer l'événement à ce calendrier
             if (isset($data['calendarId']) && !empty($data['calendarId'])) {
+                error_log('📌 Cherche calendar avec ID: ' . $data['calendarId']);
                 $calendar = $entityManager->getRepository(Calendar::class)->find($data['calendarId']);
+                error_log('📌 Calendar trouvé: ' . ($calendar ? 'OUI' : 'NON'));
                 if ($calendar) {
                     $event->setCalendar($calendar);
+                    error_log('📌 Calendar associé: ' . $calendar->getName());
                     // Utiliser la couleur du calendrier si disponible
                     $event->setColor($calendar->getColor());
                 } else {
+                    error_log('❌ Calendar NOT FOUND with ID: ' . $data['calendarId']);
                     return $this->json(['error' => 'Calendar not found'], 404);
                 }
             } else {
@@ -236,6 +240,7 @@ class EventController extends AbstractController
         }
         
         $calendar = $event->getCalendar();
+        error_log('📊 Event ID ' . $event->getId() . ' - Calendar: ' . ($calendar ? $calendar->getName() : 'NULL'));
         
         // Convertir le type backend -> frontend
         $backendType = $event->getType();

@@ -34,6 +34,11 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+.btn-primary.active {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  box-shadow: 0 2px 8px rgba(67, 233, 123, 0.3);
+}
+
 .btn-secondary {
   padding: 0.5rem 1rem;
   background: #f8f9fa;

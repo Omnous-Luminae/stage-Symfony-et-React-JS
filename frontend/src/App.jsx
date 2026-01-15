@@ -13,6 +13,7 @@ import LoginPage from './pages/LoginPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import { AuthProvider, RequireAuth } from './auth/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
+import { CalendarProvider } from './context/CalendarContext'
 import NotificationCenter from './components/NotificationCenter'
 import './App.css'
 
@@ -20,8 +21,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <NotificationProvider>
-          <NotificationCenter />
+        <CalendarProvider>
+          <NotificationProvider>
+            <NotificationCenter />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -96,7 +98,8 @@ function App() {
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
-        </NotificationProvider>
+          </NotificationProvider>
+        </CalendarProvider>
       </AuthProvider>
     </BrowserRouter>
   )

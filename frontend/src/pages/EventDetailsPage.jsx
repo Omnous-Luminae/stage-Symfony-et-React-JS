@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
+import { useCalendar } from '../context/CalendarContext'
 import { eventService } from '../api/events'
 import './EventDetailsPage.css'
 
 function EventDetailsPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { activeCalendar } = useCalendar()
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -31,10 +33,11 @@ function EventDetailsPage() {
         endDate: '',
         location: '',
         type: 'other',
-        description: ''
+        description: '',
+        calendarId: activeCalendar?.id || ''
       })
     }
-  }, [id])
+  }, [id, activeCalendar])
 
   const loadEvent = async () => {
     try {
@@ -60,10 +63,22 @@ function EventDetailsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const payload = {
+        title: event.title,
+        start: event.startDate,
+        end: event.endDate,
+        type: event.type,
+        location: event.location,
+        description: event.description,
+        calendarId: activeCalendar?.id || ''
+      }
+      console.log('📤 Envoi événement:', payload)
+      console.log('📤 CalendarId:', activeCalendar?.id)
+      
       if (id) {
-        await eventService.update(id, event)
+        await eventService.update(id, payload)
       } else {
-        await eventService.create(event)
+        await eventService.create(payload)
       }
       navigate('/calendar')
     } catch (err) {
@@ -170,6 +185,19 @@ function EventDetailsPage() {
                 disabled={!isEditing && id}
               />
             </div>
+
+            {activeCalendar && (
+              <div className="calendar-info" style={{ 
+                padding: '12px', 
+                background: '#f0f7ff', 
+                borderLeft: `4px solid ${activeCalendar.color}`,
+                borderRadius: '4px',
+                marginTop: '16px'
+              }}>
+                <strong>📅 Agenda sélectionné:</strong> {activeCalendar.name}
+                <input type="hidden" value={activeCalendar.id} />
+              </div>
+            )}
           </div>
 
           <div className="form-actions">

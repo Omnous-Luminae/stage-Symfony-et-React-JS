@@ -1,9 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { useCalendar } from '../context/CalendarContext'
 import './Layout.css'
 
 function Layout({ children }) {
   const { user, logout, isAuthenticated } = useAuth()
+  const { activeCalendar } = useCalendar()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -55,26 +57,27 @@ function Layout({ children }) {
       </header>
 
       <nav className="layout-nav">
-        <Link 
-          to="/calendar" 
-          className={isActive('/calendar') ? 'nav-link active' : 'nav-link'}
-        >
-          📅 Calendrier
-        </Link>
-        <Link 
-          to="/events" 
-          className={isActive('/events') ? 'nav-link active' : 'nav-link'}
-        >
-          🎯 Événements
-        </Link>
-        {isAuthenticated && (
-          <>
-            <Link 
-              to="/home" 
-              className={isActive('/home') ? 'nav-link active' : 'nav-link'}
-            >
-              🏠 Accueil
-            </Link>
+        <div className="nav-left">
+          <Link 
+            to="/calendar" 
+            className={isActive('/calendar') ? 'nav-link active' : 'nav-link'}
+          >
+            📅 Calendrier
+          </Link>
+          <Link 
+            to="/events" 
+            className={isActive('/events') ? 'nav-link active' : 'nav-link'}
+          >
+            🎯 Événements
+          </Link>
+          {isAuthenticated && (
+            <>
+              <Link 
+                to="/home" 
+                className={isActive('/home') ? 'nav-link active' : 'nav-link'}
+              >
+                🏠 Accueil
+              </Link>
             <Link 
               to="/dashboard" 
               className={isActive('/dashboard') ? 'nav-link active' : 'nav-link'}
@@ -95,14 +98,23 @@ function Layout({ children }) {
                 👥 Utilisateurs
               </Link>
             )}
-          </>
+            </>
+          )}
+          <Link 
+            to="/about" 
+            className={isActive('/about') ? 'nav-link active' : 'nav-link'}
+          >
+            ℹ️ À propos
+          </Link>
+        </div>
+        
+        {activeCalendar && (
+          <div className="active-calendar-badge">
+            <span style={{ color: activeCalendar.color }}>●</span>
+            <span className="calendar-name">{activeCalendar.name}</span>
+          </div>
         )}
-        <Link 
-          to="/about" 
-          className={isActive('/about') ? 'nav-link active' : 'nav-link'}
-        >
-          ℹ️ À propos
-        </Link>
+        
         {isAuthenticated && (
           <Link 
             to="/settings" 

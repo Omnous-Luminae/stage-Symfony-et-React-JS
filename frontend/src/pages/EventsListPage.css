@@ -68,8 +68,9 @@
 
 .filters-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 16px;
+  align-items: flex-end;
 }
 
 .filter-group {
@@ -97,6 +98,24 @@
 .filter-group select:focus {
   outline: none;
   border-color: #667eea;
+}
+
+.btn-reset {
+  padding: 10px 16px;
+  background: #f0f0f0;
+  color: #333;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-reset:hover {
+  background: #e0e0e0;
+  border-color: #999;
 }
 
 .error-message {
