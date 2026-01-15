@@ -258,29 +258,20 @@ class EventController extends AbstractController
     }
 
     #[Route('/calendars', name: 'calendars_list', methods: ['GET'])]
-    public function calendars(): JsonResponse
+    public function calendars(EntityManagerInterface $entityManager): JsonResponse
     {
-        $calendars = [
-            [
-                'id' => 1,
-                'name' => 'Mon Agenda Personnel',
-                'type' => 'personal',
-                'color' => self::COLOR_BLUE
-            ],
-            [
-                'id' => 2,
-                'name' => 'Professeurs Mathématiques',
-                'type' => 'shared',
-                'color' => self::COLOR_GREEN
-            ],
-            [
-                'id' => 3,
-                'name' => 'Réunions Lycée',
-                'type' => 'shared',
-                'color' => self::COLOR_RED
-            ]
-        ];
+        $calendars = $entityManager->getRepository(Calendar::class)->findAll();
+        
+        $result = [];
+        foreach ($calendars as $calendar) {
+            $result[] = [
+                'id' => $calendar->getId(),
+                'name' => $calendar->getName(),
+                'color' => $calendar->getColor(),
+                'createdBy' => $calendar->getCreatedBy() ? $calendar->getCreatedBy()->getId() : null
+            ];
+        }
 
-        return $this->json($calendars);
+        return $this->json($result);
     }
 }
