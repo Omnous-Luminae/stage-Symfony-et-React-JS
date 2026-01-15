@@ -57,6 +57,8 @@ function AgendasPage() {
       console.error(err)
     }
   }
+
+  const handleCreateCalendar = async (e) => {
     e.preventDefault()
     try {
       console.log('📤 Création agenda - payload:', newCalendar)
