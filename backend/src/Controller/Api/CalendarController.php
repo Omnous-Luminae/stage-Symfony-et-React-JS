@@ -27,10 +27,11 @@ class CalendarController extends AbstractController
         }
 
         // Get user's own calendars
-        $ownedCalendars = $calendarRepository->findBy(['owner_id' => $user->getId()]);
+        $userId = $user instanceof User ? $user->getId() : null;
+        $ownedCalendars = $calendarRepository->findBy(['owner_id' => $userId]);
         
         // Get shared calendars
-        $sharedPermissions = $permissionRepository->findBy(['user_id' => $user->getId()]);
+        $sharedPermissions = $permissionRepository->findBy(['user_id' => $userId]);
         $sharedCalendars = [];
         foreach ($sharedPermissions as $permission) {
             $sharedCalendars[] = $permission->getCalendar();
@@ -130,7 +131,10 @@ class CalendarController extends AbstractController
             }
 
             // Verify user owns this calendar
-            if ($calendar->getOwnerId() !== $this->getUser()?->getId() && !$this->isGranted('ROLE_ADMIN')) {
+            $currentUser = $this->getUser();
+            $currentUserId = $currentUser instanceof User ? $currentUser->getId() : null;
+            $calendarOwnerId = $calendar->getOwner() instanceof User ? $calendar->getOwner()->getId() : null;
+            if ($calendarOwnerId !== $currentUserId && !$this->isGranted('ROLE_ADMIN')) {
                 return $this->json(['error' => 'Unauthorized'], 403);
             }
 

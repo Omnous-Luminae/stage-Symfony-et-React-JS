@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\Event;
 use App\Entity\Calendar;
+use App\Entity\User;
 use App\Repository\EventRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -264,11 +265,12 @@ class EventController extends AbstractController
         
         $result = [];
         foreach ($calendars as $calendar) {
+            $owner = $calendar->getOwner();
             $result[] = [
                 'id' => $calendar->getId(),
                 'name' => $calendar->getName(),
                 'color' => $calendar->getColor(),
-                'createdBy' => $calendar->getCreatedBy() ? $calendar->getCreatedBy()->getId() : null
+                'owner_id' => $owner instanceof User ? $owner->getId() : null
             ];
         }
 
