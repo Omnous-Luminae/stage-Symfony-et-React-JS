@@ -5,6 +5,7 @@ import { eventService } from '../api/events'
 import './EventsListPage.css'
 
 function EventsListPage() {
+  console.log('🔍 EventsListPage MOUNTED!')
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

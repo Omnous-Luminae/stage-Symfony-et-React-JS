@@ -42,28 +42,20 @@ function App() {
               element={<EventDetailsPage />}
             />
             <Route
+              path="/events"
+              element={<EventsListPage />}
+            />
+            <Route
               path="/event/new"
               element={<EventDetailsPage />}
             />
             <Route
+              path="/event/:eventId/alerts"
+              element={<EventAlertsPage />}
+            />
+            <Route
               path="/event/:id"
               element={<EventDetailsPage />}
-            />
-            <Route
-              path="/event/:eventId/alerts"
-              element={
-                <RequireAuth>
-                  <EventAlertsPage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/events"
-              element={
-                <RequireAuth>
-                  <EventsListPage />
-                </RequireAuth>
-              }
             />
             <Route
               path="/agendas"

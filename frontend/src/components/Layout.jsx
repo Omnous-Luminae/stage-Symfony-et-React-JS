@@ -61,6 +61,12 @@ function Layout({ children }) {
         >
           📅 Calendrier
         </Link>
+        <Link 
+          to="/events" 
+          className={isActive('/events') ? 'nav-link active' : 'nav-link'}
+        >
+          🎯 Événements
+        </Link>
         {isAuthenticated && (
           <>
             <Link 
