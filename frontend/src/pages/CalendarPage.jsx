@@ -50,6 +50,8 @@ function mapApiEvent(event) {
   const type = event.extendedProps?.type ?? event.type ?? 'other'
   const location = event.extendedProps?.location ?? event.location ?? ''
   const description = event.extendedProps?.description ?? event.description ?? ''
+  const calendarId = event.extendedProps?.calendarId ?? event.calendarId ?? null
+  const calendarName = event.extendedProps?.calendarName ?? event.calendarName ?? 'Événement général'
   const color = event.backgroundColor || typeColors[type] || '#667eea'
 
   return {
@@ -63,6 +65,8 @@ function mapApiEvent(event) {
       type,
       location,
       description,
+      calendarId,
+      calendarName,
       color
     }
   }
@@ -92,8 +96,11 @@ function CalendarPage() {
   if (activeCalendar) {
     filteredEvents = filteredEvents.filter(evt => {
       const eventCalendarId = evt.extendedProps?.calendarId
-      return eventCalendarId && eventCalendarId === activeCalendar.id
+      return eventCalendarId && Number(eventCalendarId) === Number(activeCalendar.id)
     })
+  } else {
+    // Pas d'agenda actif = aucun événement affiché
+    filteredEvents = []
   }
   
   const calendarEvents = filteredEvents.map(evt => ({ ...evt }))
