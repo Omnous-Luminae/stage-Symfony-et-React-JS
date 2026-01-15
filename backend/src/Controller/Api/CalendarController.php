@@ -19,10 +19,26 @@ use Symfony\Component\Serializer\SerializerInterface;
 class CalendarController extends AbstractController
 {
     #[Route('', name: 'list', methods: ['GET'])]
-    public function list(CalendarRepository $calendarRepository, SerializerInterface $serializer): JsonResponse
+    public function list(CalendarRepository $calendarRepository, CalendarPermissionRepository $permissionRepository, SerializerInterface $serializer): JsonResponse
     {
-        $calendars = $calendarRepository->findAll();
-        $data = $serializer->serialize($calendars, 'json', ['groups' => 'calendar:read']);
+        $user = $this->getUser();
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], 401);
+        }
+
+        // Get user's own calendars
+        $ownedCalendars = $calendarRepository->findBy(['owner_id' => $user->getId()]);
+        
+        // Get shared calendars
+        $sharedPermissions = $permissionRepository->findBy(['user_id' => $user->getId()]);
+        $sharedCalendars = [];
+        foreach ($sharedPermissions as $permission) {
+            $sharedCalendars[] = $permission->getCalendar();
+        }
+        
+        $allCalendars = array_unique(array_merge($ownedCalendars, $sharedCalendars), SORT_REGULAR);
+        
+        $data = $serializer->serialize($allCalendars, 'json', ['groups' => 'calendar:read']);
         
         return $this->json(json_decode($data, true));
     }
@@ -105,9 +121,19 @@ class CalendarController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    public function delete(Calendar $calendar, EntityManagerInterface $entityManager): JsonResponse
+    public function delete(int $id, CalendarRepository $calendarRepository, EntityManagerInterface $entityManager): JsonResponse
     {
         try {
+            $calendar = $calendarRepository->find($id);
+            if (!$calendar) {
+                return $this->json(['error' => 'Calendar not found'], 404);
+            }
+
+            // Verify user owns this calendar
+            if ($calendar->getOwnerId() !== $this->getUser()?->getId() && !$this->isGranted('ROLE_ADMIN')) {
+                return $this->json(['error' => 'Unauthorized'], 403);
+            }
+
             $entityManager->remove($calendar);
             $entityManager->flush();
 
