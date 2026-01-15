@@ -21,11 +21,16 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS calendars (
   id_calendar INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  description LONGTEXT DEFAULT NULL,
   color VARCHAR(7) DEFAULT '#3788d8',
+  type VARCHAR(50) NOT NULL DEFAULT 'Personal',
+  owner_id INT NULL,
   created_by_id INT NULL,
+  is_public TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT FK_calendar_user FOREIGN KEY (created_by_id) REFERENCES users(id_user) ON DELETE SET NULL
+  CONSTRAINT FK_calendar_user FOREIGN KEY (created_by_id) REFERENCES users(id_user) ON DELETE SET NULL,
+  CONSTRAINT FK_calendar_owner FOREIGN KEY (owner_id) REFERENCES users(id_user) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS events (
@@ -178,14 +183,10 @@ CREATE TABLE IF NOT EXISTS teacher_class (
   INDEX idx_class_id (class_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Données de test
+
+-- Données de test minimales
 INSERT INTO users (id_user, first_name, last_name, email, role, roles, password, status, created_at, updated_at) 
 VALUES (1, 'Jean', 'Dupont', 'j.dupont@lycee.fr', 'Professeur', '["ROLE_PROFESSOR"]', '$2y$13$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUmmS46m', 'Actif', NOW(), NOW());
 
--- Créer un agenda personnel pour l'utilisateur
-INSERT INTO calendars (id_calendar, name, color, created_by_id, created_at, updated_at) 
-VALUES (1, 'Mon Agenda Personnel', '#3788d8', 1, NOW(), NOW());
-
-
 insert into users (id_user, first_name, last_name, email, role, roles, password, status, created_at, updated_at) 
-VALUES (2, 'Ethan', 'Enjolras', 'enjolras.ethan3@gmail.com', 'Intervenant', '["ROLE_INTERVENANT"]', '$2y$10$q0VzATxurLiVLIhTAXAaSeDRfCamKmkKj/Igm8UpKvMHfk.5ArEU6', 'Actif', NOW(), NOW()); 
+VALUES (2, 'Ethan', 'Enjolras', 'enjolras.ethan3@gmail.com', 'Intervenant', '["ROLE_INTERVENANT"]', '$2y$10$q0VzATxurLiVLIhTAXAaSeDRfCamKmkKj/Igm8UpKvMHfk.5ArEU6', 'Actif', NOW(), NOW());

@@ -47,9 +47,12 @@ class CalendarController extends AbstractController
             $calendar->setColor($data['color'] ?? '#667eea');
             $calendar->setType(Calendar::TYPE_PERSONAL);
 
-            // Associer le propriétaire (utilisateur actuellement authentifié)
-            // Pour l'instant, on utilise un utilisateur par défaut
-            $user = $userRepository->findOneBy(['email' => 'demo@example.com']);
+            // Assigner le propriétaire (utilisateur actuellement authentifié)
+            $user = $this->getUser();
+            if (!$user) {
+                // Fallback: récupérer le premier utilisateur (temporaire)
+                $user = $userRepository->findOneBy([]);
+            }
             if ($user) {
                 $calendar->setOwner($user);
             }

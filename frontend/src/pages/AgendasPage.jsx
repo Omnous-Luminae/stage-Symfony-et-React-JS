@@ -37,14 +37,35 @@ function AgendasPage() {
     }
   }
 
-  const handleCreateCalendar = async (e) => {
+  const handleDeleteCalendar = async (calendarId) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cet agenda ?')) return
+    try {
+      await calendarService.delete(calendarId)
+      await loadCalendars()
+    } catch (err) {
+      setError('Erreur lors de la suppression')
+      console.error(err)
+    }
+  }
+
+  const handleUpdateCalendar = async (calendarId, updates) => {
+    try {
+      await calendarService.update(calendarId, updates)
+      await loadCalendars()
+    } catch (err) {
+      setError('Erreur lors de la modification')
+      console.error(err)
+    }
+  }
     e.preventDefault()
     try {
       console.log('📤 Création agenda - payload:', newCalendar)
-      await calendarService.create(newCalendar)
+      const response = await calendarService.create(newCalendar)
+      console.log('✅ Agenda créé:', response.data)
       setShowNewModal(false)
       setNewCalendar({ name: '', description: '', color: '#667eea' })
       await loadCalendars()
+      console.log('📚 Agendas après création:', calendars)
     } catch (err) {
       const apiMessage = err?.response?.data?.error || err?.response?.data?.message
       setError(apiMessage || 'Erreur lors de la création de l\'agenda')
@@ -52,11 +73,8 @@ function AgendasPage() {
     }
   }
 
-  const ownedCalendars = calendars.filter(cal => cal.owner?.id === user?.id)
-  const sharedCalendars = calendars.filter(cal => 
-    cal.owner?.id !== user?.id && 
-    cal.permissions?.some(perm => perm.user?.id === user?.id)
-  )
+  const ownedCalendars = calendars // Afficher tous les agendas pour l'instant
+  const sharedCalendars = []
 
   const filteredOwned = ownedCalendars.filter(cal =>
     cal.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -107,9 +125,9 @@ function AgendasPage() {
                         </div>
                       </div>
                       <div className="agenda-actions">
-                        <button className="btn-secondary">✏️ Modifier</button>
-                        <button className="btn-secondary">📤 Partager</button>
-                        <button className="btn-danger">🗑️</button>
+                        <button className="btn-secondary" onClick={() => alert('Modifier: ' + calendar.name)}>✏️ Modifier</button>
+                        <button className="btn-secondary" onClick={() => alert('Partager: ' + calendar.name)}>📤 Partager</button>
+                        <button className="btn-danger" onClick={() => handleDeleteCalendar(calendar.id)}>🗑️</button>
                       </div>
                     </div>
                   ))}
