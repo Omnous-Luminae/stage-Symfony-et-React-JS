@@ -18,6 +18,7 @@ body {
   margin: 0;
   min-height: 100vh;
   background: #f5f7fa;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 a {
@@ -27,4 +28,27 @@ a {
 
 #root {
   min-height: 100vh;
+}
+
+/* Mode sombre global */
+body.dark-mode {
+  background-color: #1a1a2e;
+  color: #e2e8f0;
+}
+
+body.dark-mode ::-webkit-scrollbar {
+  width: 8px;
+}
+
+body.dark-mode ::-webkit-scrollbar-track {
+  background: #16213e;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #667eea;
 }

@@ -43,15 +43,18 @@ CREATE TABLE IF NOT EXISTS events (
   type ENUM('Cours', 'Réunion', 'Examen', 'Administratif', 'Formation', 'Autre') NOT NULL DEFAULT 'Autre',
   color VARCHAR(7) NULL,
   is_recurrent TINYINT(1) NOT NULL DEFAULT 0,
-  recurrence_type ENUM('Quotidien', 'Hebdomadaire', 'Mensuel') NULL,
-  recurrence_pattern JSON NULL,
-  recurrence_end_date DATE NULL,
+  recurrence_type VARCHAR(50) NULL COMMENT 'daily, weekly, biweekly, monthly, yearly',
+  recurrence_interval INT NULL DEFAULT 1 COMMENT 'Répéter tous les X jours/semaines/mois',
+  recurrence_days JSON NULL COMMENT 'Jours de la semaine pour récurrence hebdo: ["mon","tue","wed"]',
+  recurrence_end_date DATE NULL COMMENT 'Date de fin de la récurrence',
+  parent_event_id INT NULL COMMENT 'ID de événement parent pour les occurrences générées',
   calendar_id INT NULL,
   created_by_id INT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT FK_event_calendar FOREIGN KEY (calendar_id) REFERENCES calendars(id_calendar) ON DELETE CASCADE,
-  CONSTRAINT FK_event_user FOREIGN KEY (created_by_id) REFERENCES users(id_user) ON DELETE SET NULL
+  CONSTRAINT FK_event_user FOREIGN KEY (created_by_id) REFERENCES users(id_user) ON DELETE SET NULL,
+  CONSTRAINT FK_event_parent FOREIGN KEY (parent_event_id) REFERENCES events(id_events) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS calendar_permissions (
@@ -184,9 +187,7 @@ CREATE TABLE IF NOT EXISTS teacher_class (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- Données de test minimales
-INSERT INTO users (id_user, first_name, last_name, email, role, roles, password, status, created_at, updated_at) 
-VALUES (1, 'Jean', 'Dupont', 'j.dupont@lycee.fr', 'Professeur', '["ROLE_PROFESSOR"]', '$2y$13$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUmmS46m', 'Actif', NOW(), NOW());
 
 insert into users (id_user, first_name, last_name, email, role, roles, password, status, created_at, updated_at) 
-VALUES (2, 'Ethan', 'Enjolras', 'enjolras.ethan3@gmail.com', 'Intervenant', '["ROLE_INTERVENANT"]', '$2y$10$q0VzATxurLiVLIhTAXAaSeDRfCamKmkKj/Igm8UpKvMHfk.5ArEU6', 'Actif', NOW(), NOW());
+VALUES (1, 'Ethan', 'Enjolras', 'enjolras.ethan3@gmail.com', 'Intervenant', '["ROLE_INTERVENANT"]', '$2y$10$q0VzATxurLiVLIhTAXAaSeDRfCamKmkKj/Igm8UpKvMHfk.5ArEU6', 'Actif', NOW(), NOW());
+

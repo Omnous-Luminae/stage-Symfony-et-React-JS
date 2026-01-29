@@ -93,6 +93,79 @@ class AuthController extends AbstractController
         return $this->json($this->userPayload($user));
     }
 
+    #[Route('/me', name: 'update_profile', methods: ['PUT', 'PATCH'])]
+    public function updateProfile(Request $request, UserRepository $userRepository): JsonResponse
+    {
+        $userId = $request->getSession()->get('user_id');
+        if (!$userId) {
+            return $this->json(['error' => 'Unauthenticated'], 401);
+        }
+        $user = $userRepository->find($userId);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        if (isset($data['firstName']) && !empty(trim($data['firstName']))) {
+            $user->setFirstName(trim($data['firstName']));
+        }
+        if (isset($data['lastName']) && !empty(trim($data['lastName']))) {
+            $user->setLastName(trim($data['lastName']));
+        }
+        if (isset($data['email']) && filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            // Vérifier si l'email n'est pas déjà pris par un autre utilisateur
+            $existingUser = $userRepository->findOneBy(['email' => $data['email']]);
+            if ($existingUser && $existingUser->getId() !== $user->getId()) {
+                return $this->json(['error' => 'Cet email est déjà utilisé'], 400);
+            }
+            $user->setEmail($data['email']);
+        }
+
+        $this->em->flush();
+
+        return $this->json([
+            'message' => 'Profil mis à jour avec succès',
+            'user' => $this->userPayload($user)
+        ]);
+    }
+
+    #[Route('/change-password', name: 'change_password', methods: ['POST'])]
+    public function changePassword(
+        Request $request,
+        UserRepository $userRepository,
+        UserPasswordHasherInterface $passwordHasher
+    ): JsonResponse {
+        $userId = $request->getSession()->get('user_id');
+        if (!$userId) {
+            return $this->json(['error' => 'Unauthenticated'], 401);
+        }
+        $user = $userRepository->find($userId);
+        if (!$user) {
+            return $this->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $currentPassword = $data['currentPassword'] ?? '';
+        $newPassword = $data['newPassword'] ?? '';
+
+        // Vérifier le mot de passe actuel
+        if (!$passwordHasher->isPasswordValid($user, $currentPassword)) {
+            return $this->json(['error' => 'Mot de passe actuel incorrect'], 400);
+        }
+
+        // Vérifier la force du nouveau mot de passe
+        if (!$this->isStrongPassword($newPassword)) {
+            return $this->json(['error' => 'Le nouveau mot de passe doit contenir au moins 12 caractères, avec majuscules, minuscules, chiffres et caractères spéciaux'], 400);
+        }
+
+        // Mettre à jour le mot de passe
+        $user->setPassword($passwordHasher->hashPassword($user, $newPassword));
+        $this->em->flush();
+
+        return $this->json(['message' => 'Mot de passe modifié avec succès']);
+    }
+
     #[Route('/logout', name: 'logout', methods: ['POST'])]
     public function logout(Request $request): JsonResponse
     {

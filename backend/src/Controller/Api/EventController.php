@@ -195,9 +195,29 @@ class EventController extends AbstractController
                 $event->setColor($colorMap[$frontendType] ?? self::COLOR_BLUE);
             }
 
-            // Persister l'événement
+            // Gestion de la récurrence
+            $isRecurring = $data['isRecurring'] ?? false;
+            $event->setIsRecurrent($isRecurring);
+            
+            if ($isRecurring) {
+                $event->setRecurrenceType($data['recurrenceType'] ?? 'weekly');
+                $event->setRecurrenceInterval((int)($data['recurrenceInterval'] ?? 1));
+                $event->setRecurrenceDays($data['recurrenceDays'] ?? null);
+                
+                if (!empty($data['recurrenceEndDate'])) {
+                    $recurrenceEndDate = new \DateTime($data['recurrenceEndDate']);
+                    $event->setRecurrenceEndDate($recurrenceEndDate);
+                }
+            }
+
+            // Persister l'événement principal
             $entityManager->persist($event);
             $entityManager->flush();
+
+            // Si récurrent, générer les occurrences
+            if ($isRecurring && !empty($data['recurrenceEndDate'])) {
+                $this->generateRecurringEvents($event, $entityManager);
+            }
 
             // Retourner l'événement au format FullCalendar
             return $this->json($this->eventToArray($event), 201);
@@ -206,8 +226,113 @@ class EventController extends AbstractController
         }
     }
 
+    /**
+     * Génère les occurrences d'un événement récurrent
+     */
+    private function generateRecurringEvents(Event $parentEvent, EntityManagerInterface $entityManager): void
+    {
+        $recurrenceType = $parentEvent->getRecurrenceType();
+        $interval = $parentEvent->getRecurrenceInterval() ?? 1;
+        $recurrenceDays = $parentEvent->getRecurrenceDays() ?? [];
+        $endDate = $parentEvent->getRecurrenceEndDate();
+        
+        if (!$endDate) {
+            return;
+        }
+
+        // Convertir en DateTime pour pouvoir utiliser modify() et add()
+        $currentStart = new \DateTime($parentEvent->getStartDate()->format('Y-m-d H:i:s'));
+        $currentEnd = new \DateTime($parentEvent->getEndDate()->format('Y-m-d H:i:s'));
+        $recurrenceEndDate = new \DateTime($endDate->format('Y-m-d'));
+        $duration = $currentStart->diff($currentEnd);
+        
+        // Map des jours de la semaine
+        $dayMap = [
+            'sun' => 0, 'mon' => 1, 'tue' => 2, 'wed' => 3,
+            'thu' => 4, 'fri' => 5, 'sat' => 6
+        ];
+        
+        // Limiter à 52 occurrences max pour éviter les problèmes de performance
+        $maxOccurrences = 52;
+        $occurrenceCount = 0;
+        
+        while ($currentStart <= $recurrenceEndDate && $occurrenceCount < $maxOccurrences) {
+            // Calculer la prochaine date selon le type de récurrence
+            switch ($recurrenceType) {
+                case 'daily':
+                    $currentStart->modify("+{$interval} day");
+                    break;
+                    
+                case 'weekly':
+                case 'biweekly':
+                    $weeksToAdd = $recurrenceType === 'biweekly' ? 2 * $interval : $interval;
+                    
+                    if (!empty($recurrenceDays)) {
+                        // Avancer au prochain jour spécifié
+                        $found = false;
+                        $daysChecked = 0;
+                        while (!$found && $daysChecked < 14) {
+                            $currentStart->modify('+1 day');
+                            $currentDayNum = (int)$currentStart->format('w');
+                            foreach ($recurrenceDays as $day) {
+                                if (isset($dayMap[$day]) && $dayMap[$day] === $currentDayNum) {
+                                    $found = true;
+                                    break;
+                                }
+                            }
+                            $daysChecked++;
+                        }
+                        if (!$found) {
+                            $currentStart->modify("+{$weeksToAdd} week");
+                        }
+                    } else {
+                        $currentStart->modify("+{$weeksToAdd} week");
+                    }
+                    break;
+                    
+                case 'monthly':
+                    $currentStart->modify("+{$interval} month");
+                    break;
+                    
+                case 'yearly':
+                    $currentStart->modify("+{$interval} year");
+                    break;
+                    
+                default:
+                    return;
+            }
+            
+            if ($currentStart > $recurrenceEndDate) {
+                break;
+            }
+            
+            // Calculer la date de fin
+            $currentEnd = clone $currentStart;
+            $currentEnd->add($duration);
+            
+            // Créer l'occurrence
+            $occurrence = new Event();
+            $occurrence->setTitle($parentEvent->getTitle());
+            $occurrence->setDescription($parentEvent->getDescription());
+            $occurrence->setStartDate(clone $currentStart);
+            $occurrence->setEndDate(clone $currentEnd);
+            $occurrence->setLocation($parentEvent->getLocation());
+            $occurrence->setType($parentEvent->getType());
+            $occurrence->setColor($parentEvent->getColor());
+            $occurrence->setCalendar($parentEvent->getCalendar());
+            $occurrence->setCreatedBy($parentEvent->getCreatedBy());
+            $occurrence->setParentEvent($parentEvent);
+            $occurrence->setIsRecurrent(false); // Les occurrences ne sont pas récurrentes elles-mêmes
+            
+            $entityManager->persist($occurrence);
+            $occurrenceCount++;
+        }
+        
+        $entityManager->flush();
+    }
+
     #[Route('/events/{id}', name: 'events_delete', methods: ['DELETE'])]
-    public function delete(int $id, EntityManagerInterface $entityManager, EventRepository $eventRepository): JsonResponse
+    public function delete(int $id, Request $request, EntityManagerInterface $entityManager, EventRepository $eventRepository): JsonResponse
     {
         $event = $eventRepository->find($id);
         
@@ -215,7 +340,33 @@ class EventController extends AbstractController
             return $this->json(['error' => 'Event not found'], 404);
         }
 
-        // Supprimer l'événement
+        // Vérifier si on doit supprimer toute la série
+        $deleteSeries = $request->query->get('deleteSeries') === 'true';
+        
+        if ($deleteSeries) {
+            // Si c'est un événement parent (récurrent), supprimer toutes ses occurrences
+            if ($event->isIsRecurrent()) {
+                // Supprimer toutes les occurrences enfants
+                foreach ($event->getChildEvents() as $childEvent) {
+                    $entityManager->remove($childEvent);
+                }
+            }
+            
+            // Si c'est une occurrence (a un parent), supprimer le parent et toutes les occurrences
+            $parentEvent = $event->getParentEvent();
+            if ($parentEvent) {
+                // Supprimer toutes les occurrences du parent
+                foreach ($parentEvent->getChildEvents() as $childEvent) {
+                    $entityManager->remove($childEvent);
+                }
+                // Supprimer le parent lui-même
+                $entityManager->remove($parentEvent);
+                $entityManager->flush();
+                return $this->json(['message' => 'Event series deleted successfully'], 200);
+            }
+        }
+
+        // Supprimer l'événement (simple ou parent après suppression des enfants)
         $entityManager->remove($event);
         $entityManager->flush();
 
@@ -307,6 +458,20 @@ class EventController extends AbstractController
         $backendType = $event->getType();
         $frontendType = self::TYPE_MAPPING_REVERSE[$backendType] ?? 'other';
         
+        // Informations de récurrence
+        $recurrenceInfo = null;
+        if ($event->isIsRecurrent()) {
+            $recurrenceInfo = [
+                'type' => $event->getRecurrenceType(),
+                'interval' => $event->getRecurrenceInterval(),
+                'days' => $event->getRecurrenceDays(),
+                'endDate' => $event->getRecurrenceEndDate() ? $event->getRecurrenceEndDate()->format('Y-m-d') : null
+            ];
+        }
+        
+        // Vérifier si c'est une occurrence d'un événement parent
+        $parentEventId = $event->getParentEvent() ? $event->getParentEvent()->getId() : null;
+        
         return [
             'id' => $event->getId(),
             'title' => $event->getTitle(),
@@ -319,7 +484,10 @@ class EventController extends AbstractController
                 'location' => $event->getLocation(),
                 'description' => $event->getDescription(),
                 'calendarId' => $calendar ? $calendar->getId() : null,
-                'calendarName' => $calendar ? $calendar->getName() : 'Événement général'
+                'calendarName' => $calendar ? $calendar->getName() : 'Événement général',
+                'isRecurring' => $event->isIsRecurrent(),
+                'recurrence' => $recurrenceInfo,
+                'parentEventId' => $parentEventId
             ]
         ];
     }
@@ -370,24 +538,5 @@ class EventController extends AbstractController
         }
         
         return $this->json($debug);
-    }
-
-    #[Route('/calendars', name: 'calendars_list', methods: ['GET'])]
-    public function calendars(EntityManagerInterface $entityManager): JsonResponse
-    {
-        $calendars = $entityManager->getRepository(Calendar::class)->findAll();
-        
-        $result = [];
-        foreach ($calendars as $calendar) {
-            $owner = $calendar->getOwner();
-            $result[] = [
-                'id' => $calendar->getId(),
-                'name' => $calendar->getName(),
-                'color' => $calendar->getColor(),
-                'owner_id' => $owner instanceof User ? $owner->getId() : null
-            ];
-        }
-
-        return $this->json($result);
     }
 }

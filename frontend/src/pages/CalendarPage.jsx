@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -7,6 +7,7 @@ import Layout from '../components/Layout'
 import { eventService, calendarService } from '../api/events'
 import { useAuth } from '../auth/AuthContext'
 import { useNotification } from '../context/NotificationContext'
+import { usePreferences } from '../hooks/usePreferences'
 import './CalendarPage.css'
 
 const typeColors = {
@@ -23,7 +24,12 @@ const defaultFormData = {
   endDate: '',
   location: '',
   type: 'other',
-  description: ''
+  description: '',
+  isRecurring: false,
+  recurrenceType: 'weekly',
+  recurrenceInterval: 1,
+  recurrenceEndDate: '',
+  recurrenceDays: []
 }
 
 const calendarColors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#ff9a56', '#00d2d3', '#54a0ff']
@@ -37,14 +43,28 @@ function toLocalInputValue(value) {
 
 function formatDateForInput(dateStr) {
   if (!dateStr) return ''
+  // Si la date contient déjà une heure (format ISO avec T), la conserver
+  if (dateStr.includes('T') && dateStr.length > 11) {
+    return dateStr.slice(0, 16) // Format YYYY-MM-DDTHH:mm
+  }
   return dateStr.split('T')[0] + 'T08:00'
 }
 
-function formatEndDateForInput(dateStr) {
+function formatEndDateForInput(dateStr, isAllDay = false) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
-  date.setDate(date.getDate() - 1)
-  return date.toISOString().split('T')[0] + 'T09:00'
+  
+  // Si c'est une sélection de journée entière (pas d'heure spécifiée ou date seule)
+  // FullCalendar renvoie le jour APRÈS la fin, donc on soustrait 1 jour
+  const hasTime = dateStr.includes('T') && dateStr.length > 11 && !dateStr.endsWith('T00:00:00')
+  
+  if (!hasTime || isAllDay) {
+    const date = new Date(dateStr)
+    date.setDate(date.getDate() - 1)
+    return date.toISOString().split('T')[0] + 'T09:00'
+  }
+  
+  // Si l'heure est spécifiée, la conserver telle quelle
+  return dateStr.slice(0, 16)
 }
 
 function mapApiEvent(event) {
@@ -54,6 +74,9 @@ function mapApiEvent(event) {
   const calendarId = event.extendedProps?.calendarId ?? event.calendarId ?? null
   const calendarName = event.extendedProps?.calendarName ?? event.calendarName ?? 'Événement général'
   const color = event.backgroundColor || typeColors[type] || '#667eea'
+  const isRecurring = event.extendedProps?.isRecurring ?? false
+  const recurrence = event.extendedProps?.recurrence ?? null
+  const parentEventId = event.extendedProps?.parentEventId ?? null
 
   return {
     id: event.id,
@@ -68,7 +91,10 @@ function mapApiEvent(event) {
       description,
       calendarId,
       calendarName,
-      color
+      color,
+      isRecurring,
+      recurrence,
+      parentEventId
     }
   }
 }
@@ -76,6 +102,28 @@ function mapApiEvent(event) {
 function CalendarPage() {
   const { user, isAuthenticated } = useAuth()
   const { showSuccess, showError } = useNotification()
+  const { preferences } = usePreferences()
+  
+  // Convertir les préférences en paramètres FullCalendar
+  const calendarSettings = useMemo(() => {
+    // Mapping de la vue par défaut
+    const viewMapping = {
+      'month': 'dayGridMonth',
+      'week': 'timeGridWeek',
+      'day': 'timeGridDay'
+    }
+    
+    // Mapping du premier jour de la semaine (0 = dimanche, 1 = lundi)
+    const firstDayMapping = {
+      'sunday': 0,
+      'monday': 1
+    }
+    
+    return {
+      initialView: viewMapping[preferences.defaultView] || 'dayGridMonth',
+      firstDay: firstDayMapping[preferences.weekStartsOn] || 1
+    }
+  }, [preferences.defaultView, preferences.weekStartsOn])
   
   // États pour les agendas
   const [calendars, setCalendars] = useState([])
@@ -93,6 +141,8 @@ function CalendarPage() {
   const [showEventModal, setShowEventModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showEditEventModal, setShowEditEventModal] = useState(false)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState({ type: null, id: null, name: '', isRecurring: false, parentEventId: null })
   
   // État pour le formulaire d'agenda
   const [calendarFormData, setCalendarFormData] = useState({
@@ -190,7 +240,13 @@ function CalendarPage() {
   }
 
   const handleDeleteCalendar = async (calendarId) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet agenda et tous ses événements ?')) return
+    const calendar = calendars.find(c => c.id === calendarId)
+    setDeleteTarget({ type: 'calendar', id: calendarId, name: calendar?.name || 'cet agenda' })
+    setShowDeleteConfirmModal(true)
+  }
+
+  const confirmDeleteCalendar = async () => {
+    const calendarId = deleteTarget.id
     try {
       await calendarService.delete(calendarId)
       setCalendars(prev => prev.filter(c => c.id !== calendarId))
@@ -198,6 +254,8 @@ function CalendarPage() {
         const remaining = calendars.filter(c => c.id !== calendarId)
         setActiveCalendar(remaining[0] || null)
       }
+      setShowDeleteConfirmModal(false)
+      setDeleteTarget({ type: null, id: null, name: '' })
       showSuccess('Agenda supprimé')
     } catch (err) {
       console.error('Erreur suppression agenda:', err)
@@ -263,7 +321,8 @@ function CalendarPage() {
       return
     }
     const startDate = formatDateForInput(info.startStr)
-    const endDate = formatEndDateForInput(info.endStr)
+    // Passer info.allDay pour savoir si c'est une sélection de journée entière
+    const endDate = formatEndDateForInput(info.endStr, info.allDay)
     setFormData({ ...defaultFormData, startDate, endDate })
     setShowEventModal(true)
     info.jsEvent?.preventDefault()
@@ -285,14 +344,31 @@ function CalendarPage() {
         type: formData.type,
         location: formData.location,
         description: formData.description,
-        calendarId: activeCalendar.id
+        calendarId: activeCalendar.id,
+        // Données de récurrence
+        isRecurring: formData.isRecurring,
+        recurrenceType: formData.recurrenceType,
+        recurrenceInterval: formData.recurrenceInterval,
+        recurrenceDays: formData.recurrenceDays,
+        recurrenceEndDate: formData.recurrenceEndDate
       }
       const response = await eventService.create(payload)
       const newEvent = mapApiEvent(response.data)
       setEvents(prev => [...prev, newEvent])
       setFormData(defaultFormData)
       setShowEventModal(false)
-      showSuccess('Événement créé')
+      
+      // Message personnalisé si récurrent
+      if (formData.isRecurring && formData.recurrenceEndDate) {
+        showSuccess('Événement récurrent créé avec ses occurrences')
+      } else {
+        showSuccess('Événement créé')
+      }
+      
+      // Recharger les événements pour voir les occurrences générées
+      if (formData.isRecurring && formData.recurrenceEndDate) {
+        loadEvents()
+      }
     } catch (err) {
       console.error('Erreur création événement:', err)
       showError('Erreur lors de la création')
@@ -339,17 +415,85 @@ function CalendarPage() {
 
   const handleDeleteEvent = async () => {
     if (!selectedEvent) return
-    if (!confirm('Supprimer cet événement ?')) return
+    const isRecurring = selectedEvent.extendedProps?.isRecurring || false
+    const parentEventId = selectedEvent.extendedProps?.parentEventId || null
+    // Si c'est une occurrence (a un parent), on utilise l'ID du parent pour supprimer la série
+    setDeleteTarget({ 
+      type: 'event', 
+      id: selectedEvent.id, 
+      name: selectedEvent.title,
+      isRecurring,
+      parentEventId,
+      // Si c'est le parent ou une occurrence, on peut supprimer la série
+      isPartOfSeries: isRecurring || parentEventId !== null
+    })
+    setShowDeleteConfirmModal(true)
+  }
+
+  // Supprimer uniquement cette occurrence
+  const confirmDeleteSingleEvent = async () => {
     try {
-      await eventService.delete(selectedEvent.id)
-      setEvents(prev => prev.filter(e => e.id !== Number.parseInt(selectedEvent.id)))
+      await eventService.delete(deleteTarget.id)
+      setEvents(prev => prev.filter(e => e.id !== Number.parseInt(deleteTarget.id)))
       setShowDetailsModal(false)
       setSelectedEvent(null)
+      setShowDeleteConfirmModal(false)
+      setDeleteTarget({ type: null, id: null, name: '', isRecurring: false, parentEventId: null })
+      showSuccess('Occurrence supprimée')
+    } catch (err) {
+      console.error('Erreur suppression événement:', err)
+      showError('Erreur lors de la suppression')
+    }
+  }
+
+  // Supprimer toute la série (parent + occurrences)
+  const confirmDeleteEventSeries = async () => {
+    try {
+      // Si c'est une occurrence, on supprime via le parent
+      // Si c'est le parent, on le supprime directement (le backend supprimera les enfants en cascade)
+      const idToDelete = deleteTarget.parentEventId || deleteTarget.id
+      await eventService.delete(idToDelete, { deleteSeries: true })
+      
+      // Recharger tous les événements pour refléter la suppression en cascade
+      await loadEvents()
+      
+      setShowDetailsModal(false)
+      setSelectedEvent(null)
+      setShowDeleteConfirmModal(false)
+      setDeleteTarget({ type: null, id: null, name: '', isRecurring: false, parentEventId: null })
+      showSuccess('Série d\'événements supprimée')
+    } catch (err) {
+      console.error('Erreur suppression série:', err)
+      showError('Erreur lors de la suppression de la série')
+    }
+  }
+
+  const confirmDeleteEvent = async () => {
+    try {
+      await eventService.delete(deleteTarget.id)
+      setEvents(prev => prev.filter(e => e.id !== Number.parseInt(deleteTarget.id)))
+      setShowDetailsModal(false)
+      setSelectedEvent(null)
+      setShowDeleteConfirmModal(false)
+      setDeleteTarget({ type: null, id: null, name: '', isRecurring: false, parentEventId: null })
       showSuccess('Événement supprimé')
     } catch (err) {
       console.error('Erreur suppression événement:', err)
       showError('Erreur lors de la suppression')
     }
+  }
+
+  const confirmDelete = async () => {
+    if (deleteTarget.type === 'calendar') {
+      await confirmDeleteCalendar()
+    } else if (deleteTarget.type === 'event') {
+      await confirmDeleteEvent()
+    }
+  }
+
+  const cancelDelete = () => {
+    setShowDeleteConfirmModal(false)
+    setDeleteTarget({ type: null, id: null, name: '', isRecurring: false, parentEventId: null })
   }
 
   const handleEventDrop = async (info) => {
@@ -427,45 +571,13 @@ function CalendarPage() {
               </div>
             ) : (
               <>
+                {/* Agendas personnels (dont l'utilisateur est propriétaire) */}
                 <div className="calendar-section">
-                  <h4>📌 Personnels</h4>
-                  {calendars.filter(c => c.type === 'personal' || !c.type).map(calendar => (
-                    <div
-                      key={calendar.id}
-                      className={`calendar-item ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
-                      onClick={() => setActiveCalendar(calendar)}
-                    >
-                      <div className="calendar-color-dot" style={{ background: calendar.color }} />
-                      <div className="calendar-item-info">
-                        <div className="calendar-item-name">{calendar.name}</div>
-                        <div className="calendar-item-meta">
-                          {events.filter(e => e.extendedProps?.calendarId === calendar.id).length} événement(s)
-                        </div>
-                      </div>
-                      <div className="calendar-item-actions">
-                        <button 
-                          className="btn-icon" 
-                          title="Partager"
-                          onClick={(e) => { e.stopPropagation(); setActiveCalendar(calendar); setShowShareModal(true); }}
-                        >
-                          📤
-                        </button>
-                        <button 
-                          className="btn-icon danger" 
-                          title="Supprimer"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteCalendar(calendar.id); }}
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {calendars.filter(c => c.type === 'shared').length > 0 && (
-                  <div className="calendar-section">
-                    <h4>👥 Partagés avec moi</h4>
-                    {calendars.filter(c => c.type === 'shared').map(calendar => (
+                  <h4>📌 Agendas personnels</h4>
+                  {calendars.filter(c => c.type === 'personal' || c.isOwner).length === 0 ? (
+                    <div className="empty-section">Aucun agenda personnel</div>
+                  ) : (
+                    calendars.filter(c => c.type === 'personal' || c.isOwner).map(calendar => (
                       <div
                         key={calendar.id}
                         className={`calendar-item ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
@@ -475,13 +587,53 @@ function CalendarPage() {
                         <div className="calendar-item-info">
                           <div className="calendar-item-name">{calendar.name}</div>
                           <div className="calendar-item-meta">
-                            Par {calendar.owner?.firstName || 'Inconnu'}
+                            {events.filter(e => e.extendedProps?.calendarId === calendar.id).length} événement(s)
+                          </div>
+                        </div>
+                        <div className="calendar-item-actions">
+                          <button 
+                            className="btn-icon" 
+                            title="Partager"
+                            onClick={(e) => { e.stopPropagation(); setActiveCalendar(calendar); setShowShareModal(true); }}
+                          >
+                            📤
+                          </button>
+                          <button 
+                            className="btn-icon danger" 
+                            title="Supprimer"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteCalendar(calendar.id); }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Agendas partagés avec moi */}
+                <div className="calendar-section">
+                  <h4>👥 Agendas partagés</h4>
+                  {calendars.filter(c => c.type === 'shared' && !c.isOwner).length === 0 ? (
+                    <div className="empty-section">Aucun agenda partagé avec vous</div>
+                  ) : (
+                    calendars.filter(c => c.type === 'shared' && !c.isOwner).map(calendar => (
+                      <div
+                        key={calendar.id}
+                        className={`calendar-item shared ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
+                        onClick={() => setActiveCalendar(calendar)}
+                      >
+                        <div className="calendar-color-dot" style={{ background: calendar.color }} />
+                        <div className="calendar-item-info">
+                          <div className="calendar-item-name">{calendar.name}</div>
+                          <div className="calendar-item-meta">
+                            Par {calendar.ownerName || 'Inconnu'} • {calendar.permission || 'Consultation'}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -540,8 +692,10 @@ function CalendarPage() {
               </div>
 
               <FullCalendar
+                key={`${calendarSettings.initialView}-${calendarSettings.firstDay}`}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
+                initialView={calendarSettings.initialView}
+                firstDay={calendarSettings.firstDay}
                 headerToolbar={{
                   left: 'prev,next today',
                   center: 'title',
@@ -850,6 +1004,115 @@ function CalendarPage() {
                     placeholder="Description optionnelle"
                   />
                 </div>
+
+                {/* Section récurrence */}
+                <div className="form-group recurrence-section">
+                  <label className="recurrence-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={formData.isRecurring}
+                      onChange={e => {
+                        const isRecurring = e.target.checked
+                        let recurrenceEndDate = formData.recurrenceEndDate
+                        
+                        // Si on active la récurrence et qu'il n'y a pas de date de fin, en définir une par défaut (1 mois après)
+                        if (isRecurring && !recurrenceEndDate && formData.startDate) {
+                          const startDate = new Date(formData.startDate)
+                          startDate.setMonth(startDate.getMonth() + 1)
+                          recurrenceEndDate = startDate.toISOString().split('T')[0]
+                        }
+                        
+                        setFormData({ 
+                          ...formData, 
+                          isRecurring,
+                          recurrenceEndDate
+                        })
+                      }}
+                    />
+                    <span>🔄 Événement récurrent</span>
+                  </label>
+
+                  {formData.isRecurring && (
+                    <div className="recurrence-options">
+                      <div className="recurrence-row">
+                        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                          <label>Type de récurrence</label>
+                          <select
+                            value={formData.recurrenceType}
+                            onChange={e => setFormData({ ...formData, recurrenceType: e.target.value })}
+                            className="recurrence-select"
+                          >
+                            <option value="daily">📅 Quotidien</option>
+                            <option value="weekly">📆 Hebdomadaire</option>
+                            <option value="biweekly">📆 Toutes les 2 semaines</option>
+                            <option value="monthly">🗓️ Mensuel</option>
+                            <option value="yearly">🎂 Annuel</option>
+                          </select>
+                        </div>
+                        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                          <label>Répéter tous les</label>
+                          <div className="interval-input">
+                            <input
+                              type="number"
+                              min="1"
+                              max="30"
+                              value={formData.recurrenceInterval}
+                              onChange={e => setFormData({ ...formData, recurrenceInterval: parseInt(e.target.value) || 1 })}
+                            />
+                            <span>
+                              {formData.recurrenceType === 'daily' && 'jour(s)'}
+                              {formData.recurrenceType === 'weekly' && 'semaine(s)'}
+                              {formData.recurrenceType === 'biweekly' && 'période(s)'}
+                              {formData.recurrenceType === 'monthly' && 'mois'}
+                              {formData.recurrenceType === 'yearly' && 'an(s)'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {(formData.recurrenceType === 'weekly' || formData.recurrenceType === 'biweekly') && (
+                        <div className="form-group" style={{ marginBottom: 0, marginTop: '15px' }}>
+                          <label>Jours de la semaine</label>
+                          <div className="weekday-picker">
+                            {[
+                              { key: 'mon', label: 'L' },
+                              { key: 'tue', label: 'M' },
+                              { key: 'wed', label: 'M' },
+                              { key: 'thu', label: 'J' },
+                              { key: 'fri', label: 'V' },
+                              { key: 'sat', label: 'S' },
+                              { key: 'sun', label: 'D' }
+                            ].map(day => (
+                              <button
+                                key={day.key}
+                                type="button"
+                                className={`weekday-btn ${formData.recurrenceDays.includes(day.key) ? 'active' : ''}`}
+                                onClick={() => {
+                                  const days = formData.recurrenceDays.includes(day.key)
+                                    ? formData.recurrenceDays.filter(d => d !== day.key)
+                                    : [...formData.recurrenceDays, day.key]
+                                  setFormData({ ...formData, recurrenceDays: days })
+                                }}
+                              >
+                                {day.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="form-group" style={{ marginBottom: 0, marginTop: '15px' }}>
+                        <label>Jusqu'au</label>
+                        <input
+                          type="date"
+                          value={formData.recurrenceEndDate}
+                          onChange={e => setFormData({ ...formData, recurrenceEndDate: e.target.value })}
+                          className="recurrence-end-date"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="modal-body">
                 <div className="modal-actions">
@@ -1031,6 +1294,65 @@ function CalendarPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirmation de suppression */}
+      {showDeleteConfirmModal && (
+        <div className="modal-overlay" onClick={cancelDelete}>
+          <div className="modal-content delete-confirm-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header delete-header">
+              <div className="delete-icon-container">
+                <span className="delete-icon">🗑️</span>
+              </div>
+              <h2>Confirmer la suppression</h2>
+            </div>
+            <div className="modal-body">
+              <div className="delete-message">
+                <p>Êtes-vous sûr de vouloir supprimer</p>
+                <p className="delete-item-name">"{deleteTarget.name}"</p>
+                {deleteTarget.type === 'calendar' && (
+                  <p className="delete-warning">
+                    ⚠️ Tous les événements de cet agenda seront également supprimés.
+                  </p>
+                )}
+                {deleteTarget.type === 'event' && deleteTarget.isPartOfSeries && (
+                  <p className="delete-warning recurring-warning">
+                    🔄 Cet événement fait partie d'une série récurrente.
+                  </p>
+                )}
+                <p className="delete-info">Cette action est irréversible.</p>
+              </div>
+              <div className="modal-actions delete-actions">
+                <button type="button" className="btn-cancel" onClick={cancelDelete}>
+                  Annuler
+                </button>
+                {/* Pour les événements récurrents, afficher deux options */}
+                {deleteTarget.type === 'event' && deleteTarget.isPartOfSeries ? (
+                  <>
+                    <button 
+                      type="button" 
+                      className="btn-delete-single" 
+                      onClick={confirmDeleteSingleEvent}
+                    >
+                      📅 Cette occurrence
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-delete-confirm" 
+                      onClick={confirmDeleteEventSeries}
+                    >
+                      🗑️ Toute la série
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="btn-delete-confirm" onClick={confirmDelete}>
+                    🗑️ Supprimer
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -27,24 +27,64 @@ class CalendarController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], 401);
         }
 
+        error_log('📅 CalendarController::list - User: ' . $user->getEmail() . ' (ID: ' . $user->getId() . ')');
+
         // Get user's own calendars
         $ownedCalendars = $calendarRepository->findBy(['owner' => $user]);
+        error_log('📅 Owned calendars: ' . count($ownedCalendars));
 
-        // Get shared calendars
+        // Get shared calendars (where user has permission but is NOT the owner)
         $sharedPermissions = $permissionRepository->findBy(['user' => $user]);
+        error_log('📅 Shared permissions: ' . count($sharedPermissions));
+        
         $sharedCalendars = [];
         foreach ($sharedPermissions as $permission) {
             $calendar = $permission->getCalendar();
-            if ($calendar) {
-                $sharedCalendars[] = $calendar;
+            // Ne pas inclure les calendriers dont l'utilisateur est propriétaire
+            if ($calendar && $calendar->getOwner() && $calendar->getOwner()->getId() !== $user->getId()) {
+                $sharedCalendars[] = [
+                    'calendar' => $calendar,
+                    'permission' => $permission->getPermission(),
+                    'ownerName' => $calendar->getOwner()->getFirstName() . ' ' . $calendar->getOwner()->getLastName()
+                ];
             }
         }
 
-        $allCalendars = array_unique(array_merge($ownedCalendars, $sharedCalendars), SORT_REGULAR);
-
-        $data = $serializer->serialize($allCalendars, 'json', ['groups' => 'calendar:read']);
+        // Build response with ownership info
+        $result = [];
         
-        return $this->json(json_decode($data, true));
+        // Add owned calendars
+        foreach ($ownedCalendars as $calendar) {
+            $result[] = [
+                'id' => $calendar->getId(),
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+                'type' => 'personal',
+                'isOwner' => true,
+                'owner_id' => $user->getId()
+            ];
+        }
+        
+        // Add shared calendars
+        foreach ($sharedCalendars as $shared) {
+            $calendar = $shared['calendar'];
+            $result[] = [
+                'id' => $calendar->getId(),
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+                'type' => 'shared',
+                'isOwner' => false,
+                'permission' => $shared['permission'],
+                'ownerName' => $shared['ownerName'],
+                'owner_id' => $calendar->getOwner()->getId()
+            ];
+        }
+
+        error_log('📅 Total calendars returned: ' . count($result));
+
+        return $this->json($result);
     }
 
     #[Route('', name: 'create', methods: ['POST'])]

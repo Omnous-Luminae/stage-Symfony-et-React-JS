@@ -10,8 +10,11 @@ export const eventService = {
   // Mettre à jour un événement
   update: (id, eventData) => api.put(`/events/${id}`, eventData),
   
-  // Supprimer un événement
-  delete: (id) => api.delete(`/events/${id}`),
+  // Supprimer un événement (options: { deleteSeries: true } pour supprimer la série entière)
+  delete: (id, options = {}) => {
+    const params = options.deleteSeries ? '?deleteSeries=true' : ''
+    return api.delete(`/events/${id}${params}`)
+  },
 };
 
 export const calendarService = {

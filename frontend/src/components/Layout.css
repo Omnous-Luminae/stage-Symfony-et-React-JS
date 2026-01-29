@@ -205,3 +205,48 @@
     padding: 1rem;
   }
 }
+
+/* Mode sombre pour Layout */
+body.dark-mode .layout {
+  background: #1a1a2e;
+}
+
+body.dark-mode .layout-nav {
+  background: #16213e;
+  border-bottom-color: #0f3460;
+}
+
+body.dark-mode .nav-link {
+  color: #a0aec0;
+}
+
+body.dark-mode .nav-link:hover {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+body.dark-mode .nav-link.active {
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.15);
+}
+
+body.dark-mode .user-dropdown {
+  background: #16213e;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .user-dropdown a,
+body.dark-mode .user-dropdown button {
+  color: #e2e8f0;
+}
+
+body.dark-mode .user-dropdown a:hover,
+body.dark-mode .user-dropdown button:hover {
+  background: #0f3460;
+}
+
+body.dark-mode .active-calendar-badge {
+  background: #0f3460;
+  color: #e2e8f0;
+  border-color: #2d3748;
+}

@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\EventRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -61,13 +63,24 @@ class Event
     #[Groups(['event:read', 'event:write'])]
     private ?string $recurrenceType = null;
 
+    #[ORM\Column(type: Types::INTEGER, nullable: true)]
+    #[Groups(['event:read', 'event:write'])]
+    private ?int $recurrenceInterval = 1;
+
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['event:read', 'event:write'])]
-    private ?array $recurrencePattern = null;
+    private ?array $recurrenceDays = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
     #[Groups(['event:read', 'event:write'])]
     private ?\DateTimeInterface $recurrenceEndDate = null;
+
+    #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'childEvents')]
+    #[ORM\JoinColumn(name: 'parent_event_id', referencedColumnName: 'id_events', nullable: true, onDelete: 'CASCADE')]
+    private ?Event $parentEvent = null;
+
+    #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parentEvent')]
+    private Collection $childEvents;
 
     #[ORM\ManyToOne(inversedBy: 'events')]
     #[ORM\JoinColumn(name: 'calendar_id', referencedColumnName: 'id_calendar', nullable: true, onDelete: 'CASCADE')]
@@ -91,6 +104,7 @@ class Event
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+        $this->childEvents = new ArrayCollection();
     }
 
     #[ORM\PreUpdate]
@@ -220,22 +234,35 @@ class Event
 
     public function setRecurrenceType(?string $recurrenceType): static
     {
-        if ($recurrenceType && !in_array($recurrenceType, ['Quotidien', 'Hebdomadaire', 'Mensuel'])) {
-            throw new \InvalidArgumentException('Invalid recurrence type');
+        $validTypes = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'];
+        if ($recurrenceType && !in_array($recurrenceType, $validTypes)) {
+            throw new \InvalidArgumentException('Invalid recurrence type: ' . $recurrenceType);
         }
         $this->recurrenceType = $recurrenceType;
 
         return $this;
     }
 
-    public function getRecurrencePattern(): ?array
+    public function getRecurrenceInterval(): ?int
     {
-        return $this->recurrencePattern;
+        return $this->recurrenceInterval;
     }
 
-    public function setRecurrencePattern(?array $recurrencePattern): static
+    public function setRecurrenceInterval(?int $recurrenceInterval): static
     {
-        $this->recurrencePattern = $recurrencePattern;
+        $this->recurrenceInterval = $recurrenceInterval;
+
+        return $this;
+    }
+
+    public function getRecurrenceDays(): ?array
+    {
+        return $this->recurrenceDays;
+    }
+
+    public function setRecurrenceDays(?array $recurrenceDays): static
+    {
+        $this->recurrenceDays = $recurrenceDays;
 
         return $this;
     }
@@ -248,6 +275,47 @@ class Event
     public function setRecurrenceEndDate(?\DateTimeInterface $recurrenceEndDate): static
     {
         $this->recurrenceEndDate = $recurrenceEndDate;
+
+        return $this;
+    }
+
+    public function getParentEvent(): ?self
+    {
+        return $this->parentEvent;
+    }
+
+    public function setParentEvent(?self $parentEvent): static
+    {
+        $this->parentEvent = $parentEvent;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Event>
+     */
+    public function getChildEvents(): Collection
+    {
+        return $this->childEvents;
+    }
+
+    public function addChildEvent(Event $childEvent): static
+    {
+        if (!$this->childEvents->contains($childEvent)) {
+            $this->childEvents->add($childEvent);
+            $childEvent->setParentEvent($this);
+        }
+
+        return $this;
+    }
+
+    public function removeChildEvent(Event $childEvent): static
+    {
+        if ($this->childEvents->removeElement($childEvent)) {
+            if ($childEvent->getParentEvent() === $this) {
+                $childEvent->setParentEvent(null);
+            }
+        }
 
         return $this;
     }
