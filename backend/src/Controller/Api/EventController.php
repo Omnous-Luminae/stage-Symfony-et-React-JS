@@ -364,9 +364,39 @@ class EventController extends AbstractController
                 $entityManager->flush();
                 return $this->json(['message' => 'Event series deleted successfully'], 200);
             }
+        } else {
+            // Suppression d'un seul événement
+            // Si c'est un événement parent récurrent avec des enfants
+            if ($event->isIsRecurrent() && count($event->getChildEvents()) > 0) {
+                $children = $event->getChildEvents()->toArray();
+                
+                // Trouver le premier enfant qui deviendra le nouveau parent
+                $newParent = array_shift($children);
+                
+                // Transférer les propriétés de récurrence au nouveau parent
+                $newParent->setIsRecurrent(true);
+                $newParent->setRecurrenceType($event->getRecurrenceType());
+                $newParent->setRecurrenceInterval($event->getRecurrenceInterval());
+                $newParent->setRecurrenceDays($event->getRecurrenceDays());
+                $newParent->setRecurrenceEndDate($event->getRecurrenceEndDate());
+                $newParent->setParentEvent(null); // Il devient le nouveau parent
+                
+                // Réattribuer les autres enfants au nouveau parent
+                foreach ($children as $child) {
+                    $child->setParentEvent($newParent);
+                }
+                
+                $entityManager->remove($event);
+                $entityManager->flush();
+                
+                return $this->json([
+                    'message' => 'Event deleted, series continues with remaining occurrences',
+                    'newParentId' => $newParent->getId()
+                ], 200);
+            }
         }
 
-        // Supprimer l'événement (simple ou parent après suppression des enfants)
+        // Supprimer l'événement (simple ou parent sans enfants)
         $entityManager->remove($event);
         $entityManager->flush();
 

@@ -76,7 +76,7 @@ class Event
     private ?\DateTimeInterface $recurrenceEndDate = null;
 
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'childEvents')]
-    #[ORM\JoinColumn(name: 'parent_event_id', referencedColumnName: 'id_events', nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'parent_event_id', referencedColumnName: 'id_events', nullable: true, onDelete: 'SET NULL')]
     private ?Event $parentEvent = null;
 
     #[ORM\OneToMany(targetEntity: self::class, mappedBy: 'parentEvent')]

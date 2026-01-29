@@ -53,18 +53,22 @@ function formatDateForInput(dateStr) {
 function formatEndDateForInput(dateStr, isAllDay = false) {
   if (!dateStr) return ''
   
-  // Si c'est une sélection de journée entière (pas d'heure spécifiée ou date seule)
-  // FullCalendar renvoie le jour APRÈS la fin, donc on soustrait 1 jour
-  const hasTime = dateStr.includes('T') && dateStr.length > 11 && !dateStr.endsWith('T00:00:00')
-  
-  if (!hasTime || isAllDay) {
+  // Pour les sélections "allDay" dans la vue mois, FullCalendar renvoie 
+  // le jour APRÈS la fin (ex: sélection 15-17 → end = 18)
+  // On doit soustraire 1 jour UNIQUEMENT dans ce cas
+  if (isAllDay) {
     const date = new Date(dateStr)
     date.setDate(date.getDate() - 1)
-    return date.toISOString().split('T')[0] + 'T09:00'
+    return date.toISOString().split('T')[0] + 'T17:00'
   }
   
-  // Si l'heure est spécifiée, la conserver telle quelle
-  return dateStr.slice(0, 16)
+  // Pour les sélections avec heure (vue semaine/jour), garder la date telle quelle
+  if (dateStr.includes('T') && dateStr.length > 11) {
+    return dateStr.slice(0, 16)
+  }
+  
+  // Date seule sans heure - ajouter une heure par défaut
+  return dateStr.split('T')[0] + 'T09:00'
 }
 
 function mapApiEvent(event) {

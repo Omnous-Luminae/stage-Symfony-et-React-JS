@@ -1,11 +1,25 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import api from '../api/axios'
 import './Layout.css'
 
 function Layout({ children }) {
   const { user, logout, isAuthenticated } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Check if user is admin
+  useEffect(() => {
+    if (isAuthenticated) {
+      api.get('/admin/check')
+        .then(response => setIsAdmin(response.data.isAdmin))
+        .catch(() => setIsAdmin(false))
+    } else {
+      setIsAdmin(false)
+    }
+  }, [isAuthenticated])
 
   const handleLogout = async () => {
     if (!isAuthenticated) {
@@ -67,12 +81,12 @@ function Layout({ children }) {
               >
                 📅 Calendrier
               </Link>
-              {user?.roles?.includes('ROLE_ADMIN') && (
+              {isAdmin && (
                 <Link 
-                  to="/admin/users" 
-                  className={isActive('/admin/users') ? 'nav-link active' : 'nav-link'}
+                  to="/admin" 
+                  className={location.pathname.startsWith('/admin') ? 'nav-link active' : 'nav-link'}
                 >
-                  👥 Utilisateurs
+                  ⚙️ Administration
                 </Link>
               )}
             </>

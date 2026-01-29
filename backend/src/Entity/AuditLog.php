@@ -1,0 +1,227 @@
+<?php
+
+namespace App\Entity;
+
+use App\Repository\AuditLogRepository;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
+
+#[ORM\Entity(repositoryClass: AuditLogRepository::class)]
+#[ORM\Table(name: 'audit_logs')]
+class AuditLog
+{
+    // Action types
+    public const ACTION_CREATE = 'create';
+    public const ACTION_UPDATE = 'update';
+    public const ACTION_DELETE = 'delete';
+    public const ACTION_LOGIN = 'login';
+    public const ACTION_LOGOUT = 'logout';
+    public const ACTION_LOGIN_FAILED = 'login_failed';
+    public const ACTION_PROMOTE = 'promote';
+    public const ACTION_DEMOTE = 'demote';
+    public const ACTION_PERMISSION_CHANGE = 'permission_change';
+
+    // Entity types
+    public const ENTITY_USER = 'user';
+    public const ENTITY_CALENDAR = 'calendar';
+    public const ENTITY_EVENT = 'event';
+    public const ENTITY_ADMIN = 'administrator';
+    public const ENTITY_PERMISSION = 'permission';
+
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(name: 'id_log', type: Types::INTEGER)]
+    #[Groups(['log:read'])]
+    private ?int $id = null;
+
+    #[ORM\ManyToOne(targetEntity: Administrator::class)]
+    #[ORM\JoinColumn(name: 'admin_id', referencedColumnName: 'id_admin', nullable: false)]
+    #[Groups(['log:read'])]
+    private ?Administrator $admin = null;
+
+    #[ORM\Column(name: 'action', type: Types::STRING, length: 100)]
+    #[Groups(['log:read'])]
+    private string $action;
+
+    #[ORM\Column(name: 'entity_type', type: Types::STRING, length: 50)]
+    #[Groups(['log:read'])]
+    private string $entityType;
+
+    #[ORM\Column(name: 'entity_id', type: Types::INTEGER, nullable: true)]
+    #[Groups(['log:read'])]
+    private ?int $entityId = null;
+
+    #[ORM\Column(name: 'old_value', type: Types::TEXT, nullable: true)]
+    #[Groups(['log:read'])]
+    private ?string $oldValue = null;
+
+    #[ORM\Column(name: 'new_value', type: Types::TEXT, nullable: true)]
+    #[Groups(['log:read'])]
+    private ?string $newValue = null;
+
+    #[ORM\Column(name: 'ip_address', type: Types::STRING, length: 45, nullable: true)]
+    #[Groups(['log:read'])]
+    private ?string $ipAddress = null;
+
+    #[ORM\Column(name: 'user_agent', type: Types::TEXT, nullable: true)]
+    #[Groups(['log:read'])]
+    private ?string $userAgent = null;
+
+    #[ORM\Column(name: 'created_at', type: Types::DATETIME_MUTABLE)]
+    #[Groups(['log:read'])]
+    private ?\DateTimeInterface $createdAt = null;
+
+    public function __construct()
+    {
+        $this->createdAt = new \DateTime();
+    }
+
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getAdmin(): ?Administrator
+    {
+        return $this->admin;
+    }
+
+    public function setAdmin(?Administrator $admin): static
+    {
+        $this->admin = $admin;
+        return $this;
+    }
+
+    public function getAction(): string
+    {
+        return $this->action;
+    }
+
+    public function setAction(string $action): static
+    {
+        $this->action = $action;
+        return $this;
+    }
+
+    public function getEntityType(): string
+    {
+        return $this->entityType;
+    }
+
+    public function setEntityType(string $entityType): static
+    {
+        $this->entityType = $entityType;
+        return $this;
+    }
+
+    public function getEntityId(): ?int
+    {
+        return $this->entityId;
+    }
+
+    public function setEntityId(?int $entityId): static
+    {
+        $this->entityId = $entityId;
+        return $this;
+    }
+
+    public function getOldValue(): ?string
+    {
+        return $this->oldValue;
+    }
+
+    public function setOldValue(?string $oldValue): static
+    {
+        $this->oldValue = $oldValue;
+        return $this;
+    }
+
+    public function getOldValueDecoded(): ?array
+    {
+        return $this->oldValue ? json_decode($this->oldValue, true) : null;
+    }
+
+    public function getNewValue(): ?string
+    {
+        return $this->newValue;
+    }
+
+    public function setNewValue(?string $newValue): static
+    {
+        $this->newValue = $newValue;
+        return $this;
+    }
+
+    public function getNewValueDecoded(): ?array
+    {
+        return $this->newValue ? json_decode($this->newValue, true) : null;
+    }
+
+    public function getIpAddress(): ?string
+    {
+        return $this->ipAddress;
+    }
+
+    public function setIpAddress(?string $ipAddress): static
+    {
+        $this->ipAddress = $ipAddress;
+        return $this;
+    }
+
+    public function getUserAgent(): ?string
+    {
+        return $this->userAgent;
+    }
+
+    public function setUserAgent(?string $userAgent): static
+    {
+        $this->userAgent = $userAgent;
+        return $this;
+    }
+
+    public function getCreatedAt(): ?\DateTimeInterface
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeInterface $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+        return $this;
+    }
+
+    /**
+     * Get human-readable action label
+     */
+    public function getActionLabel(): string
+    {
+        return match($this->action) {
+            self::ACTION_CREATE => 'Création',
+            self::ACTION_UPDATE => 'Modification',
+            self::ACTION_DELETE => 'Suppression',
+            self::ACTION_LOGIN => 'Connexion',
+            self::ACTION_LOGOUT => 'Déconnexion',
+            self::ACTION_LOGIN_FAILED => 'Échec de connexion',
+            self::ACTION_PROMOTE => 'Promotion admin',
+            self::ACTION_DEMOTE => 'Rétrogradation',
+            self::ACTION_PERMISSION_CHANGE => 'Changement de permissions',
+            default => $this->action
+        };
+    }
+
+    /**
+     * Get human-readable entity type label
+     */
+    public function getEntityTypeLabel(): string
+    {
+        return match($this->entityType) {
+            self::ENTITY_USER => 'Utilisateur',
+            self::ENTITY_CALENDAR => 'Calendrier',
+            self::ENTITY_EVENT => 'Événement',
+            self::ENTITY_ADMIN => 'Administrateur',
+            self::ENTITY_PERMISSION => 'Permission',
+            default => $this->entityType
+        };
+    }
+}

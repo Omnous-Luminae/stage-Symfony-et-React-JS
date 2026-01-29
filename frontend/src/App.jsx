@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import DashboardPage from './pages/DashboardPage'
 import CalendarPage from './pages/CalendarPage'
 import SettingsPage from './pages/SettingsPage'
+import AdminPage from './pages/AdminPage'
 import LoginPage from './pages/LoginPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import { AuthProvider, RequireAuth } from './auth/AuthContext'
@@ -47,6 +48,14 @@ function App() {
               element={
                 <RequireAuth>
                   <SettingsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <RequireAuth>
+                  <AdminPage />
                 </RequireAuth>
               }
             />

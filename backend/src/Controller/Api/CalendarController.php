@@ -5,9 +5,11 @@ namespace App\Controller\Api;
 use App\Entity\Calendar;
 use App\Entity\CalendarPermission;
 use App\Entity\User;
+use App\Repository\AdministratorRepository;
 use App\Repository\CalendarRepository;
 use App\Repository\CalendarPermissionRepository;
 use App\Repository\UserRepository;
+use App\Service\AuditLogService;
 use App\Service\SessionUserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,10 +21,28 @@ use Symfony\Component\Serializer\SerializerInterface;
 #[Route('/api/calendars', name: 'api_calendars_')]
 class CalendarController extends AbstractController
 {
-    #[Route('', name: 'list', methods: ['GET'])]
-    public function list(CalendarRepository $calendarRepository, CalendarPermissionRepository $permissionRepository, SerializerInterface $serializer, SessionUserService $sessionUserService): JsonResponse
+    public function __construct(
+        private AuditLogService $auditLogService,
+        private AdministratorRepository $adminRepository,
+        private SessionUserService $sessionUserService
+    ) {}
+
+    private function tryLogAction(string $method, ...$args): void
     {
-        $user = $sessionUserService->getCurrentUser();
+        try {
+            $user = $this->sessionUserService->getCurrentUser();
+            if ($user && $this->adminRepository->findByUser($user)) {
+                $this->auditLogService->$method(...$args);
+            }
+        } catch (\Exception $e) {
+            // Log silently fails
+        }
+    }
+
+    #[Route('', name: 'list', methods: ['GET'])]
+    public function list(CalendarRepository $calendarRepository, CalendarPermissionRepository $permissionRepository, SerializerInterface $serializer): JsonResponse
+    {
+        $user = $this->sessionUserService->getCurrentUser();
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], 401);
         }
@@ -92,8 +112,7 @@ class CalendarController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         UserRepository $userRepository,
-        SerializerInterface $serializer,
-        SessionUserService $sessionUserService
+        SerializerInterface $serializer
     ): JsonResponse {
         try {
             $data = json_decode($request->getContent(), true);
@@ -103,7 +122,7 @@ class CalendarController extends AbstractController
             }
 
             // Vérifier que l'utilisateur est authentifié et de type User
-            $user = $sessionUserService->getCurrentUser();
+            $user = $this->sessionUserService->getCurrentUser();
             if (!$user instanceof User) {
                 return $this->json(['error' => 'Not authenticated'], 401);
             }
@@ -114,6 +133,17 @@ class CalendarController extends AbstractController
             $calendar->setColor($data['color'] ?? '#667eea');
             $calendar->setType(Calendar::TYPE_PERSONAL);
             $calendar->setOwner($user);
+
+            $entityManager->persist($calendar);
+            $entityManager->flush();
+
+            // Log the action if user is admin
+            $this->tryLogAction('logCalendarCreated', $calendar->getId(), [
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+                'ownerEmail' => $user->getEmail()
+            ]);
 
             $entityManager->persist($calendar);
             $entityManager->flush();
@@ -142,6 +172,13 @@ class CalendarController extends AbstractController
         try {
             $data = json_decode($request->getContent(), true);
 
+            // Save old values for logging
+            $oldData = [
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+            ];
+
             if (isset($data['name'])) {
                 $calendar->setName($data['name']);
             }
@@ -155,6 +192,13 @@ class CalendarController extends AbstractController
             $entityManager->persist($calendar);
             $entityManager->flush();
 
+            // Log the action if user is admin
+            $this->tryLogAction('logCalendarUpdated', $calendar->getId(), $oldData, [
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+            ]);
+
             $jsonData = $serializer->serialize($calendar, 'json', ['groups' => 'calendar:read']);
             return $this->json(json_decode($jsonData, true), 200);
         } catch (\Exception $e) {
@@ -163,7 +207,7 @@ class CalendarController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    public function delete(int $id, CalendarRepository $calendarRepository, EntityManagerInterface $entityManager, SessionUserService $sessionUserService): JsonResponse
+    public function delete(int $id, CalendarRepository $calendarRepository, EntityManagerInterface $entityManager): JsonResponse
     {
         try {
             $calendar = $calendarRepository->find($id);
@@ -172,15 +216,26 @@ class CalendarController extends AbstractController
             }
 
             // Verify user owns this calendar
-            $currentUser = $sessionUserService->getCurrentUser();
+            $currentUser = $this->sessionUserService->getCurrentUser();
             $currentUserId = $currentUser instanceof User ? $currentUser->getId() : null;
             $calendarOwnerId = $calendar->getOwner() instanceof User ? $calendar->getOwner()->getId() : null;
             if ($calendarOwnerId !== $currentUserId && !$this->isGranted('ROLE_ADMIN')) {
                 return $this->json(['error' => 'Unauthorized'], 403);
             }
 
+            // Save data for logging
+            $calendarData = [
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'ownerEmail' => $calendar->getOwner()?->getEmail()
+            ];
+            $calendarId = $calendar->getId();
+
             $entityManager->remove($calendar);
             $entityManager->flush();
+
+            // Log the action if user is admin
+            $this->tryLogAction('logCalendarDeleted', $calendarId, $calendarData);
 
             return $this->json(['message' => 'Calendar deleted successfully'], 200);
         } catch (\Exception $e) {

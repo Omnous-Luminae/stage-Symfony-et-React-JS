@@ -1,23 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 :root {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
+  line-height: 1.6;
   font-weight: 400;
-  color: #111827;
+  color: #1e293b;
   background-color: #f5f7fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  /* Couleurs principales */
+  --primary-color: #6366f1;
+  --primary-light: #818cf8;
+  --primary-dark: #4f46e5;
+  --secondary-color: #8b5cf6;
+  --accent-color: #a855f7;
+  
+  /* Couleurs neutres */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --border-color: #e2e8f0;
+  
+  /* Couleurs de feedback */
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --info-color: #3b82f6;
 }
 
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
   transition: background-color 0.3s, color 0.3s;
 }
 
@@ -30,25 +56,108 @@ a {
   min-height: 100vh;
 }
 
-/* Mode sombre global */
-body.dark-mode {
-  background-color: #1a1a2e;
-  color: #e2e8f0;
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-body.dark-mode ::-webkit-scrollbar {
-  width: 8px;
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Sélection de texte */
+::selection {
+  background: rgba(99, 102, 241, 0.2);
+  color: #4f46e5;
+}
+
+/* Mode sombre global */
+body.dark-mode {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #e2e8f0;
+  
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --bg-primary: #1e293b;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #334155;
+  --border-color: #334155;
 }
 
 body.dark-mode ::-webkit-scrollbar-track {
-  background: #16213e;
+  background: #0f172a;
 }
 
 body.dark-mode ::-webkit-scrollbar-thumb {
-  background: #4a5568;
-  border-radius: 4px;
+  background: #475569;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+body.dark-mode ::selection {
+  background: rgba(129, 140, 248, 0.3);
+  color: #c7d2fe;
 }
 
 body.dark-mode ::-webkit-scrollbar-thumb:hover {
   background: #667eea;
+}
+
+/* ==========================================
+   STYLES DE BOUTONS GLOBAUX
+   ========================================== */
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Focus visible global */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+}
+
+body.dark-mode button:focus-visible,
+body.dark-mode input:focus-visible,
+body.dark-mode select:focus-visible,
+body.dark-mode textarea:focus-visible {
+  outline-color: var(--primary-light);
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+}
+
+/* Animation de pulsation pour les boutons importants */
+@keyframes button-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 25px rgba(99, 102, 241, 0.5);
+  }
+}
+
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 100%;
+  }
 }

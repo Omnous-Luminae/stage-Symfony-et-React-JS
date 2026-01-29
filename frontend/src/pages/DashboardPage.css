@@ -274,20 +274,57 @@
 
 .btn-primary {
   display: inline-block;
-  padding: 1rem 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1.1rem 2.2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #6b21a8 100%);
   color: white;
   text-decoration: none;
-  border-radius: 8px;
-  font-weight: 600;
+  border-radius: 14px;
+  font-weight: 700;
   font-size: 1.1rem;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  letter-spacing: 0.3px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.15), transparent);
+  border-radius: 14px 14px 0 0;
+  pointer-events: none;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.45),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-primary:active {
+  transform: translateY(-1px) scale(0.98);
+  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
 }
 
 .dashboard-footer {
@@ -344,4 +381,164 @@
     flex-direction: column;
     gap: 0.5rem;
   }
+}
+
+/* ==========================================
+   MODE SOMBRE - DASHBOARD
+   ========================================== */
+body.dark-mode .dashboard-title {
+  color: #e2e8f0;
+}
+
+body.dark-mode .loading {
+  color: #94a3b8;
+}
+
+body.dark-mode .dashboard-card {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid #334155;
+}
+
+body.dark-mode .dashboard-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  border-color: #475569;
+}
+
+body.dark-mode .card-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+body.dark-mode .card-body {
+  background: transparent;
+}
+
+body.dark-mode .no-events {
+  color: #64748b;
+}
+
+body.dark-mode .event-item,
+body.dark-mode .agenda-item,
+body.dark-mode .alert-item {
+  background: linear-gradient(145deg, #334155, #1e293b);
+  border-left-color: #818cf8;
+}
+
+body.dark-mode .event-time {
+  color: #a5b4fc;
+}
+
+body.dark-mode .event-title {
+  color: #e2e8f0;
+}
+
+body.dark-mode .event-location {
+  color: #94a3b8;
+}
+
+body.dark-mode .agenda-name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .agenda-meta {
+  color: #94a3b8;
+}
+
+body.dark-mode .card-link {
+  color: #818cf8;
+}
+
+body.dark-mode .card-link:hover {
+  color: #a5b4fc;
+}
+
+body.dark-mode .week-overview {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid #334155;
+}
+
+body.dark-mode .week-overview h3 {
+  color: #e2e8f0;
+}
+
+body.dark-mode .week-day {
+  background: linear-gradient(145deg, #334155, #1e293b);
+  border: 1px solid #475569;
+}
+
+body.dark-mode .week-day:hover {
+  background: linear-gradient(145deg, #475569, #334155);
+  border-color: #64748b;
+}
+
+body.dark-mode .week-day-name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .week-day-count {
+  color: #94a3b8;
+}
+
+body.dark-mode .upcoming-section {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid #334155;
+}
+
+body.dark-mode .upcoming-section h3 {
+  color: #e2e8f0;
+}
+
+body.dark-mode .upcoming-item {
+  background: linear-gradient(145deg, #334155, #1e293b);
+  border: 1px solid #475569;
+}
+
+body.dark-mode .upcoming-item:hover {
+  background: linear-gradient(145deg, #475569, #334155);
+  border-color: #64748b;
+}
+
+body.dark-mode .upcoming-date {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+body.dark-mode .upcoming-title {
+  color: #e2e8f0;
+}
+
+body.dark-mode .upcoming-time {
+  color: #94a3b8;
+}
+
+body.dark-mode .dashboard-footer {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border: 1px solid #334155;
+}
+
+body.dark-mode .legend {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .legend-item {
+  color: #94a3b8;
+}
+
+body.dark-mode .tips p {
+  color: #94a3b8;
+}
+
+/* Amélioration des icônes d'événements en dark mode */
+body.dark-mode .event-dot {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .alert-item {
+  border-left-color: #f59e0b;
+}
+
+body.dark-mode .alert-text {
+  color: #e2e8f0;
 }
