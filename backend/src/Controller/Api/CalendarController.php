@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\CalendarRepository;
 use App\Repository\CalendarPermissionRepository;
 use App\Repository\UserRepository;
+use App\Service\SessionUserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,26 +20,28 @@ use Symfony\Component\Serializer\SerializerInterface;
 class CalendarController extends AbstractController
 {
     #[Route('', name: 'list', methods: ['GET'])]
-    public function list(CalendarRepository $calendarRepository, CalendarPermissionRepository $permissionRepository, SerializerInterface $serializer): JsonResponse
+    public function list(CalendarRepository $calendarRepository, CalendarPermissionRepository $permissionRepository, SerializerInterface $serializer, SessionUserService $sessionUserService): JsonResponse
     {
-        $user = $this->getUser();
+        $user = $sessionUserService->getCurrentUser();
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], 401);
         }
 
         // Get user's own calendars
-        $userId = $user instanceof User ? $user->getId() : null;
-        $ownedCalendars = $calendarRepository->findBy(['owner_id' => $userId]);
-        
+        $ownedCalendars = $calendarRepository->findBy(['owner' => $user]);
+
         // Get shared calendars
-        $sharedPermissions = $permissionRepository->findBy(['user_id' => $userId]);
+        $sharedPermissions = $permissionRepository->findBy(['user' => $user]);
         $sharedCalendars = [];
         foreach ($sharedPermissions as $permission) {
-            $sharedCalendars[] = $permission->getCalendar();
+            $calendar = $permission->getCalendar();
+            if ($calendar) {
+                $sharedCalendars[] = $calendar;
+            }
         }
-        
+
         $allCalendars = array_unique(array_merge($ownedCalendars, $sharedCalendars), SORT_REGULAR);
-        
+
         $data = $serializer->serialize($allCalendars, 'json', ['groups' => 'calendar:read']);
         
         return $this->json(json_decode($data, true));
@@ -49,7 +52,8 @@ class CalendarController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         UserRepository $userRepository,
-        SerializerInterface $serializer
+        SerializerInterface $serializer,
+        SessionUserService $sessionUserService
     ): JsonResponse {
         try {
             $data = json_decode($request->getContent(), true);
@@ -58,21 +62,18 @@ class CalendarController extends AbstractController
                 return $this->json(['error' => 'Name is required'], 400);
             }
 
+            // Vérifier que l'utilisateur est authentifié et de type User
+            $user = $sessionUserService->getCurrentUser();
+            if (!$user instanceof User) {
+                return $this->json(['error' => 'Not authenticated'], 401);
+            }
+
             $calendar = new Calendar();
             $calendar->setName($data['name']);
             $calendar->setDescription($data['description'] ?? '');
             $calendar->setColor($data['color'] ?? '#667eea');
             $calendar->setType(Calendar::TYPE_PERSONAL);
-
-            // Assigner le propriétaire (utilisateur actuellement authentifié)
-            $user = $this->getUser();
-            if (!$user) {
-                // Fallback: récupérer le premier utilisateur (temporaire)
-                $user = $userRepository->findOneBy([]);
-            }
-            if ($user) {
-                $calendar->setOwner($user);
-            }
+            $calendar->setOwner($user);
 
             $entityManager->persist($calendar);
             $entityManager->flush();
@@ -122,7 +123,7 @@ class CalendarController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    public function delete(int $id, CalendarRepository $calendarRepository, EntityManagerInterface $entityManager): JsonResponse
+    public function delete(int $id, CalendarRepository $calendarRepository, EntityManagerInterface $entityManager, SessionUserService $sessionUserService): JsonResponse
     {
         try {
             $calendar = $calendarRepository->find($id);
@@ -131,7 +132,7 @@ class CalendarController extends AbstractController
             }
 
             // Verify user owns this calendar
-            $currentUser = $this->getUser();
+            $currentUser = $sessionUserService->getCurrentUser();
             $currentUserId = $currentUser instanceof User ? $currentUser->getId() : null;
             $calendarOwnerId = $calendar->getOwner() instanceof User ? $calendar->getOwner()->getId() : null;
             if ($calendarOwnerId !== $currentUserId && !$this->isGranted('ROLE_ADMIN')) {
@@ -153,9 +154,20 @@ class CalendarController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         UserRepository $userRepository,
-        SerializerInterface $serializer
+        SerializerInterface $serializer,
+        SessionUserService $sessionUserService
     ): JsonResponse {
         try {
+            $currentUser = $sessionUserService->getCurrentUser();
+            if (!$currentUser instanceof User) {
+                return $this->json(['error' => 'Not authenticated'], 401);
+            }
+
+            $isOwner = $calendar->getOwner() instanceof User && $calendar->getOwner()->getId() === $currentUser->getId();
+            if (!$isOwner && !$this->isGranted('ROLE_ADMIN')) {
+                return $this->json(['error' => 'Unauthorized'], 403);
+            }
+
             $data = json_decode($request->getContent(), true);
 
             if (empty($data['email'])) {
@@ -183,15 +195,23 @@ class CalendarController extends AbstractController
             $entityManager->persist($permission);
             $entityManager->flush();
 
-            return $this->json(['message' => 'Calendar shared successfully'], 201);
+            $jsonData = $serializer->serialize($permission, 'json', ['groups' => 'permission:read']);
+
+            return $this->json(json_decode($jsonData, true), 201);
         } catch (\Exception $e) {
             return $this->json(['error' => $e->getMessage()], 400);
         }
     }
 
     #[Route('/{id}/permissions', name: 'permissions', methods: ['GET'])]
-    public function getPermissions(Calendar $calendar, SerializerInterface $serializer): JsonResponse
+    public function getPermissions(Calendar $calendar, SerializerInterface $serializer, SessionUserService $sessionUserService): JsonResponse
     {
+        $currentUser = $sessionUserService->getCurrentUser();
+        $isOwner = $calendar->getOwner() instanceof User && $currentUser instanceof User && $calendar->getOwner()->getId() === $currentUser->getId();
+        if (!$isOwner && !$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Unauthorized'], 403);
+        }
+
         $permissions = $calendar->getPermissions();
         $jsonData = $serializer->serialize($permissions, 'json', ['groups' => 'permission:read']);
         return $this->json(json_decode($jsonData, true));
@@ -202,13 +222,25 @@ class CalendarController extends AbstractController
         int $id,
         int $permissionId,
         EntityManagerInterface $entityManager,
-        CalendarPermissionRepository $permissionRepository
+        CalendarPermissionRepository $permissionRepository,
+        SessionUserService $sessionUserService
     ): JsonResponse {
         try {
+            $currentUser = $sessionUserService->getCurrentUser();
+            if (!$currentUser && !$this->isGranted('ROLE_ADMIN')) {
+                return $this->json(['error' => 'Not authenticated'], 401);
+            }
+
             $permission = $permissionRepository->find($permissionId);
 
             if (!$permission) {
                 return $this->json(['error' => 'Permission not found'], 404);
+            }
+
+            $calendar = $permission->getCalendar();
+            $isOwner = $calendar && $calendar->getOwner() instanceof User && $currentUser instanceof User && $calendar->getOwner()->getId() === $currentUser->getId();
+            if (!$isOwner && !$this->isGranted('ROLE_ADMIN')) {
+                return $this->json(['error' => 'Unauthorized'], 403);
             }
 
             $entityManager->remove($permission);

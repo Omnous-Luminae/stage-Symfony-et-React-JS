@@ -12,6 +12,10 @@ export default defineConfig({
         // Dans Docker, on utilise le nom du service backend du docker-compose
         target: 'http://backend:80',
         changeOrigin: true,
+        // Préserver les cookies de session PHP
+        cookieDomainRewrite: '',
+        // Sécurise la transmission des cookies
+        secure: false,
         // ensure proper path pass-through to PHP server
         rewrite: (path) => path,
       },

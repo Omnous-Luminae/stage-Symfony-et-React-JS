@@ -41,7 +41,7 @@ class Calendar
     private ?string $color = '#3788d8';
 
     #[ORM\ManyToOne(inversedBy: 'ownedCalendars')]
-    #[ORM\JoinColumn(name: 'created_by_id', referencedColumnName: 'id_user', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'owner_id', referencedColumnName: 'id_user', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['calendar:read'])]
     private ?User $owner = null;
 

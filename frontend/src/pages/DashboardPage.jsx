@@ -138,27 +138,30 @@ function DashboardPage() {
                   ))}
                 </div>
               )}
-              <Link to="/calendar" className="card-link">Voir tout ({events.length})</Link>
+              <Link to="/calendar" className="card-link">Voir le calendrier →</Link>
             </div>
           </div>
 
-          {/* Mes Agendas */}
+          {/* Accès rapide au calendrier */}
           <div className="dashboard-card">
             <div className="card-header">
-              <h3>📚 Mes Agendas</h3>
+              <h3>📅 Accès Rapide</h3>
             </div>
             <div className="card-body">
-              <div className="agenda-list">
-                <div className="agenda-item">
-                  <span className="agenda-color" style={{ background: '#667eea' }}></span>
-                  <div className="agenda-info">
-                    <div className="agenda-name">Mon Agenda</div>
-                    <div className="agenda-meta">Personnel</div>
-                  </div>
-                </div>
-              </div>
-              <Link to="/agendas" className="card-link">+ Nouvel agenda</Link>
-              <Link to="/agendas" className="card-link">Gérer</Link>
+              <p style={{ color: '#666', marginBottom: '15px' }}>
+                Gérez vos agendas et événements directement depuis le calendrier
+              </p>
+              <Link to="/calendar" className="card-link" style={{ 
+                display: 'inline-block', 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                color: 'white', 
+                padding: '12px 20px', 
+                borderRadius: '8px',
+                textDecoration: 'none',
+                fontWeight: '600'
+              }}>
+                📅 Ouvrir le Calendrier
+              </Link>
             </div>
           </div>
 

@@ -1,13 +1,12 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
-
+// Utiliser l'URL relative - le proxy Vite se chargera du routing
 const api = axios.create({
-  baseURL,
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json'
   },
-  withCredentials: true
+  withCredentials: true  // Important: envoie les cookies de session automatiquement
 })
 
 api.interceptors.response.use(

@@ -41,7 +41,7 @@ class EventRepository extends ServiceEntityRepository
             $qb->leftJoin('c.permissions', 'p')
                 ->andWhere(self::USER_ACCESS_CONDITION)
                 ->setParameter('user', $user)
-                ->setParameter('public', 'public');
+                ->setParameter('public', Calendar::TYPE_PUBLIC);
         }
 
         return $qb->orderBy('e.startDate', 'ASC')
@@ -99,7 +99,7 @@ class EventRepository extends ServiceEntityRepository
             ->andWhere(self::USER_ACCESS_CONDITION)
             ->setParameter('now', $now)
             ->setParameter('user', $user)
-            ->setParameter('public', 'public')
+            ->setParameter('public', Calendar::TYPE_PUBLIC)
             ->orderBy('e.startDate', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
@@ -124,7 +124,7 @@ class EventRepository extends ServiceEntityRepository
                 ->leftJoin('c.permissions', 'p')
                 ->andWhere(self::USER_ACCESS_CONDITION)
                 ->setParameter('user', $user)
-                ->setParameter('public', 'public');
+                ->setParameter('public', Calendar::TYPE_PUBLIC);
         }
 
         return $qb->orderBy('e.startDate', 'ASC')
@@ -150,12 +150,87 @@ class EventRepository extends ServiceEntityRepository
                 ->leftJoin('c.permissions', 'p')
                 ->andWhere(self::USER_ACCESS_CONDITION)
                 ->setParameter('user', $user)
-                ->setParameter('public', 'public');
+                ->setParameter('public', Calendar::TYPE_PUBLIC);
         }
 
         return $qb->orderBy('e.startDate', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Find accessible events with optional calendar and date filters
+     *
+     * @param Calendar|null $calendar
+     * @param \DateTimeInterface|null $start
+     * @param \DateTimeInterface|null $end
+     * @param User|null $user
+     * @param int $limit
+     * @param int $offset
+     * @return Event[]
+     */
+    public function findAccessible(
+        ?Calendar $calendar,
+        ?\DateTimeInterface $start,
+        ?\DateTimeInterface $end,
+        ?User $user,
+        int $limit = 100,
+        int $offset = 0
+    ): array {
+        error_log('🔍 findAccessible called - User: ' . ($user ? $user->getEmail() : 'NULL'));
+        error_log('📆 Date range: ' . ($start ? $start->format('Y-m-d H:i:s') : 'NULL') . ' to ' . ($end ? $end->format('Y-m-d H:i:s') : 'NULL'));
+        
+        $qb = $this->createQueryBuilder('e')
+            ->leftJoin('e.calendar', 'c');
+
+        if ($calendar) {
+            error_log('📅 Filter by calendar: ' . $calendar->getName());
+            $qb->andWhere('e.calendar = :calendar')
+                ->setParameter('calendar', $calendar);
+        }
+
+        if ($start) {
+            error_log('📆 Filter start: ' . $start->format('Y-m-d H:i:s'));
+            $qb->andWhere('e.endDate >= :start')
+                ->setParameter('start', $start);
+        }
+
+        if ($end) {
+            error_log('📆 Filter end: ' . $end->format('Y-m-d H:i:s'));
+            $qb->andWhere('e.startDate <= :end')
+                ->setParameter('end', $end);
+        }
+
+        if ($user) {
+            error_log('🔐 User connected - applying access control');
+            error_log('🔐 User ID: ' . $user->getId());
+            $qb->leftJoin('c.permissions', 'p')
+                ->andWhere('(c.owner = :user OR p.user = :user OR c.type = :public)')
+                ->setParameter('user', $user)
+                ->setParameter('public', Calendar::TYPE_PUBLIC);
+            
+            // Debug: show the DQL
+            error_log('📝 DQL: ' . $qb->getDQL());
+        } else {
+            error_log('❌ No user - only public calendars');
+            // Utilisateur non connecté : on ne retourne que les agendas publics
+            $qb->andWhere('c.type = :public')
+                ->setParameter('public', Calendar::TYPE_PUBLIC);
+        }
+
+        $result = $qb
+            ->orderBy('e.startDate', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        error_log('📊 findAccessible returned ' . count($result) . ' events');
+        foreach ($result as $event) {
+            error_log('  - Event: ' . $event->getTitle() . ' (Calendar: ' . ($event->getCalendar() ? $event->getCalendar()->getName() : 'NULL') . ')');
+        }
+        
+        return $result;
     }
 
     /**

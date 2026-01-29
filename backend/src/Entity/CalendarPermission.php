@@ -17,6 +17,11 @@ class CalendarPermission
     public const PERMISSION_MODIFICATION = 'Modification';
     public const PERMISSION_ADMINISTRATION = 'Administration';
 
+    // Alias en anglais pour compatibilité avec le repository et le front
+    public const PERMISSION_VIEW = self::PERMISSION_CONSULTATION;
+    public const PERMISSION_EDIT = self::PERMISSION_MODIFICATION;
+    public const PERMISSION_ADMIN = self::PERMISSION_ADMINISTRATION;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'id_c_perm', type: Types::INTEGER)]

@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import Layout from '../components/Layout'
-import { eventService } from '../api/events'
+import { eventService, calendarService } from '../api/events'
 import { useAuth } from '../auth/AuthContext'
-import { useCalendar } from '../context/CalendarContext'
-import '../App.css'
+import { useNotification } from '../context/NotificationContext'
+import './CalendarPage.css'
 
 const typeColors = {
   course: '#3788d8',
@@ -26,6 +25,8 @@ const defaultFormData = {
   type: 'other',
   description: ''
 }
+
+const calendarColors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#ff9a56', '#00d2d3', '#54a0ff']
 
 function toLocalInputValue(value) {
   if (!value) return ''
@@ -73,105 +74,199 @@ function mapApiEvent(event) {
 }
 
 function CalendarPage() {
-  const { logout, user, isAuthenticated } = useAuth()
-  const { activeCalendar } = useCalendar()
+  const { user, isAuthenticated } = useAuth()
+  const { showSuccess, showError } = useNotification()
+  
+  // États pour les agendas
+  const [calendars, setCalendars] = useState([])
+  const [activeCalendar, setActiveCalendar] = useState(null)
+  const [loadingCalendars, setLoadingCalendars] = useState(true)
+  
+  // États pour les événements
   const [events, setEvents] = useState([])
-  const [error, setError] = useState(null)
   const [filterType, setFilterType] = useState(null)
-  const [showModal, setShowModal] = useState(false)
+  
+  // États pour les modales
+  const [showNewCalendarModal, setShowNewCalendarModal] = useState(false)
+  const [showEditCalendarModal, setShowEditCalendarModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [showEventModal, setShowEventModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [showEditEventModal, setShowEditEventModal] = useState(false)
+  
+  // État pour le formulaire d'agenda
+  const [calendarFormData, setCalendarFormData] = useState({
+    name: '',
+    description: '',
+    color: '#667eea'
+  })
+  
+  // État pour le partage
+  const [shareEmail, setShareEmail] = useState('')
+  const [sharePermission, setSharePermission] = useState('Consultation')
+  const [sharedUsers, setSharedUsers] = useState([])
+  
+  // État pour le formulaire d'événement
   const [formData, setFormData] = useState(defaultFormData)
+  const [selectedEvent, setSelectedEvent] = useState(null)
 
-  // Filtrer par type ET par agenda actif
+  // Charger les agendas
+  const loadCalendars = useCallback(async () => {
+    try {
+      setLoadingCalendars(true)
+      const response = await calendarService.getAll()
+      setCalendars(response.data || [])
+      
+      // Sélectionner automatiquement le premier agenda si aucun n'est actif
+      if (!activeCalendar && response.data?.length > 0) {
+        setActiveCalendar(response.data[0])
+      }
+    } catch (err) {
+      console.error('Erreur chargement agendas:', err)
+      showError('Impossible de charger les agendas')
+    } finally {
+      setLoadingCalendars(false)
+    }
+  }, [activeCalendar, showError])
+
+  // Charger les événements
+  const loadEvents = useCallback(async () => {
+    try {
+      const response = await eventService.getAll()
+      const fetched = (response?.data || []).map(mapApiEvent)
+      setEvents(fetched)
+    } catch (err) {
+      console.error('Erreur chargement événements:', err)
+      showError('Impossible de charger les événements')
+    }
+  }, [showError])
+
+  useEffect(() => {
+    loadCalendars()
+    loadEvents()
+  }, [])
+
+  // Filtrer les événements par agenda actif et type
   let filteredEvents = events
-  
-  // Filtrer par type si sélectionné
-  if (filterType) {
-    filteredEvents = filteredEvents.filter(evt => (evt.extendedProps?.type || evt.type) === filterType)
-  }
-  
-  // Filtrer par agenda actif si un agenda est sélectionné
   if (activeCalendar) {
     filteredEvents = filteredEvents.filter(evt => {
       const eventCalendarId = evt.extendedProps?.calendarId
       return eventCalendarId && Number(eventCalendarId) === Number(activeCalendar.id)
     })
-  } else {
-    // Pas d'agenda actif = aucun événement affiché
-    filteredEvents = []
   }
-  
-  const calendarEvents = filteredEvents.map(evt => ({ ...evt }))
+  if (filterType) {
+    filteredEvents = filteredEvents.filter(evt => (evt.extendedProps?.type || evt.type) === filterType)
+  }
 
-  const loadEvents = async () => {
+  // Gestion des agendas
+  const handleCreateCalendar = async (e) => {
+    e.preventDefault()
     try {
-      setError(null)
-      const response = await eventService.getAll()
-      const fetched = (response?.data || []).map(mapApiEvent)
-      setEvents(fetched)
+      const response = await calendarService.create(calendarFormData)
+      setCalendars(prev => [...prev, response.data])
+      setActiveCalendar(response.data)
+      setShowNewCalendarModal(false)
+      setCalendarFormData({ name: '', description: '', color: '#667eea' })
+      showSuccess('Agenda créé avec succès')
     } catch (err) {
-      console.error('Erreur lors du chargement des événements:', err)
-      setError("Impossible de charger les événements. Vérifiez que le serveur Symfony est lancé.")
+      console.error('Erreur création agenda:', err)
+      showError(err?.response?.data?.error || 'Erreur lors de la création')
     }
   }
 
-  useEffect(() => {
-    const init = async () => {
-      await loadEvents()
+  const handleUpdateCalendar = async (e) => {
+    e.preventDefault()
+    if (!activeCalendar) return
+    try {
+      const response = await calendarService.update(activeCalendar.id, calendarFormData)
+      setCalendars(prev => prev.map(c => c.id === activeCalendar.id ? response.data : c))
+      setActiveCalendar(response.data)
+      setShowEditCalendarModal(false)
+      showSuccess('Agenda modifié avec succès')
+    } catch (err) {
+      console.error('Erreur modification agenda:', err)
+      showError('Erreur lors de la modification')
     }
-    init()
-  }, [])
+  }
 
+  const handleDeleteCalendar = async (calendarId) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cet agenda et tous ses événements ?')) return
+    try {
+      await calendarService.delete(calendarId)
+      setCalendars(prev => prev.filter(c => c.id !== calendarId))
+      if (activeCalendar?.id === calendarId) {
+        const remaining = calendars.filter(c => c.id !== calendarId)
+        setActiveCalendar(remaining[0] || null)
+      }
+      showSuccess('Agenda supprimé')
+    } catch (err) {
+      console.error('Erreur suppression agenda:', err)
+      showError('Erreur lors de la suppression')
+    }
+  }
+
+  const openEditCalendarModal = () => {
+    if (!activeCalendar) return
+    setCalendarFormData({
+      name: activeCalendar.name,
+      description: activeCalendar.description || '',
+      color: activeCalendar.color || '#667eea'
+    })
+    setShowEditCalendarModal(true)
+  }
+
+  // Gestion du partage
+  const handleAddShare = async () => {
+    if (!shareEmail || !activeCalendar) return
+    try {
+      // Appel API pour partager l'agenda
+      await calendarService.share(activeCalendar.id, {
+        email: shareEmail,
+        permission: sharePermission
+      })
+      setSharedUsers(prev => [...prev, { email: shareEmail, permission: sharePermission }])
+      setShareEmail('')
+      showSuccess(`Agenda partagé avec ${shareEmail}`)
+    } catch (err) {
+      console.error('Erreur partage:', err)
+      showError(err?.response?.data?.error || 'Erreur lors du partage')
+    }
+  }
+
+  const handleRemoveShare = async (email) => {
+    if (!activeCalendar) return
+    try {
+      await calendarService.removeShare(activeCalendar.id, email)
+      setSharedUsers(prev => prev.filter(u => u.email !== email))
+      showSuccess('Partage supprimé')
+    } catch (err) {
+      console.error('Erreur suppression partage:', err)
+      showError('Erreur lors de la suppression du partage')
+    }
+  }
+
+  // Gestion des événements
   const handleDateClick = (info) => {
-    if (!isAuthenticated) {
-      alert('Connectez-vous pour créer un événement.')
+    if (!activeCalendar) {
+      showError('Sélectionnez un agenda avant de créer un événement')
       return
     }
     const start = `${info.dateStr}T08:00`
     const end = `${info.dateStr}T09:00`
     setFormData({ ...defaultFormData, startDate: start, endDate: end })
-    setShowModal(true)
+    setShowEventModal(true)
   }
 
   const handleSelectRange = (info) => {
-    if (!isAuthenticated) {
-      alert('Connectez-vous pour créer un événement.')
+    if (!activeCalendar) {
+      showError('Sélectionnez un agenda avant de créer un événement')
       return
     }
     const startDate = formatDateForInput(info.startStr)
     const endDate = formatEndDateForInput(info.endStr)
     setFormData({ ...defaultFormData, startDate, endDate })
-    setShowModal(true)
-    info.jsEvent.preventDefault()
-  }
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault()
-    if (!isAuthenticated) {
-      alert('Connexion requise pour créer un événement.')
-      return
-    }
-    try {
-      const payload = {
-        title: formData.title,
-        start: formData.startDate,
-        end: formData.endDate,
-        type: formData.type,
-        location: formData.location,
-        description: formData.description
-      }
-
-      const response = await eventService.create(payload)
-      const newEvent = mapApiEvent(response.data)
-      setEvents(prev => [...prev, newEvent])
-      setFormData(defaultFormData)
-      setShowModal(false)
-    } catch (err) {
-      console.error("Erreur lors de la création de l'événement:", err)
-      alert("Erreur lors de la création de l'événement")
-    }
+    setShowEventModal(true)
+    info.jsEvent?.preventDefault()
   }
 
   const handleEventClick = (clickInfo) => {
@@ -179,45 +274,28 @@ function CalendarPage() {
     setShowDetailsModal(true)
   }
 
-  const persistEventChange = async (fcEvent) => {
-    const type = fcEvent.extendedProps?.type || 'other'
-    const location = fcEvent.extendedProps?.location || ''
-    const description = fcEvent.extendedProps?.description || ''
-
-    const payload = {
-      title: fcEvent.title,
-      start: fcEvent.startStr,
-      end: fcEvent.endStr || fcEvent.startStr,
-      type,
-      location,
-      description
-    }
-
-    const response = await eventService.update(fcEvent.id, payload)
-    return mapApiEvent(response.data)
-  }
-
-  const handleEventDrop = async (info) => {
-    if (!isAuthenticated) return
+  const handleCreateEvent = async (e) => {
+    e.preventDefault()
+    if (!activeCalendar) return
     try {
-      const updated = await persistEventChange(info.event)
-      setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
+      const payload = {
+        title: formData.title,
+        start: formData.startDate,
+        end: formData.endDate,
+        type: formData.type,
+        location: formData.location,
+        description: formData.description,
+        calendarId: activeCalendar.id
+      }
+      const response = await eventService.create(payload)
+      const newEvent = mapApiEvent(response.data)
+      setEvents(prev => [...prev, newEvent])
+      setFormData(defaultFormData)
+      setShowEventModal(false)
+      showSuccess('Événement créé')
     } catch (err) {
-      console.error("Erreur lors du déplacement de l'événement:", err)
-      info.revert()
-      alert("Impossible d'enregistrer le déplacement. Réessayez.")
-    }
-  }
-
-  const handleEventResize = async (info) => {
-    if (!isAuthenticated) return
-    try {
-      const updated = await persistEventChange(info.event)
-      setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
-    } catch (err) {
-      console.error("Erreur lors du redimensionnement de l'événement:", err)
-      info.revert()
-      alert("Impossible d'enregistrer la nouvelle durée. Réessayez.")
+      console.error('Erreur création événement:', err)
+      showError('Erreur lors de la création')
     }
   }
 
@@ -232,14 +310,12 @@ function CalendarPage() {
       description: selectedEvent.extendedProps?.description || ''
     })
     setShowDetailsModal(false)
-    setShowEditModal(true)
+    setShowEditEventModal(true)
   }
 
   const handleUpdateEvent = async (e) => {
     e.preventDefault()
     if (!selectedEvent) return
-    if (!isAuthenticated) return
-
     try {
       const payload = {
         title: formData.title,
@@ -249,1030 +325,710 @@ function CalendarPage() {
         location: formData.location,
         description: formData.description
       }
-
       const response = await eventService.update(selectedEvent.id, payload)
       const updatedEvent = mapApiEvent(response.data)
       setEvents(prev => prev.map(e => Number(e.id) === Number(response.data.id) ? updatedEvent : e))
-      setShowEditModal(false)
+      setShowEditEventModal(false)
       setSelectedEvent(null)
+      showSuccess('Événement modifié')
     } catch (err) {
-      console.error("Erreur lors de la mise à jour de l'événement:", err)
-      alert("Erreur lors de la mise à jour de l'événement")
+      console.error('Erreur modification événement:', err)
+      showError('Erreur lors de la modification')
     }
   }
 
   const handleDeleteEvent = async () => {
     if (!selectedEvent) return
-    if (!isAuthenticated) return
-
+    if (!confirm('Supprimer cet événement ?')) return
     try {
       await eventService.delete(selectedEvent.id)
       setEvents(prev => prev.filter(e => e.id !== Number.parseInt(selectedEvent.id)))
       setShowDetailsModal(false)
       setSelectedEvent(null)
+      showSuccess('Événement supprimé')
     } catch (err) {
-      console.error('Erreur lors de la suppression:', err)
-      alert("Erreur lors de la suppression de l'événement")
+      console.error('Erreur suppression événement:', err)
+      showError('Erreur lors de la suppression')
     }
+  }
+
+  const handleEventDrop = async (info) => {
+    try {
+      const payload = {
+        title: info.event.title,
+        start: info.event.startStr,
+        end: info.event.endStr || info.event.startStr,
+        type: info.event.extendedProps?.type || 'other',
+        location: info.event.extendedProps?.location || '',
+        description: info.event.extendedProps?.description || ''
+      }
+      const response = await eventService.update(info.event.id, payload)
+      const updated = mapApiEvent(response.data)
+      setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
+    } catch (err) {
+      console.error('Erreur déplacement:', err)
+      info.revert()
+      showError('Impossible de déplacer l\'événement')
+    }
+  }
+
+  const handleEventResize = async (info) => {
+    try {
+      const payload = {
+        title: info.event.title,
+        start: info.event.startStr,
+        end: info.event.endStr || info.event.startStr,
+        type: info.event.extendedProps?.type || 'other',
+        location: info.event.extendedProps?.location || '',
+        description: info.event.extendedProps?.description || ''
+      }
+      const response = await eventService.update(info.event.id, payload)
+      const updated = mapApiEvent(response.data)
+      setEvents(prev => prev.map(e => Number(e.id) === Number(updated.id) ? updated : e))
+    } catch (err) {
+      console.error('Erreur redimensionnement:', err)
+      info.revert()
+      showError('Impossible de modifier la durée')
+    }
+  }
+
+  const getTypeInfo = (type) => {
+    const types = {
+      course: { icon: '📚', label: 'Cours', color: '#3788d8' },
+      meeting: { icon: '👥', label: 'Réunion', color: '#4caf50' },
+      exam: { icon: '📝', label: 'Examen', color: '#f44336' },
+      training: { icon: '🎓', label: 'Formation', color: '#ff9800' },
+      other: { icon: '📌', label: 'Autre', color: '#9c27b0' }
+    }
+    return types[type] || types.other
   }
 
   return (
     <Layout>
-      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-          padding: '30px',
-          borderRadius: '10px',
-          marginBottom: '30px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <h1 style={{ margin: '0 0 8px 0', fontSize: '2.3em' }}>
-                📅 Agenda Partagé - Lycée/BTS
-              </h1>
-              <p style={{ margin: 0, fontSize: '1.05em', opacity: 0.9 }}>
-                Gestion d'agenda collaborative pour professeurs et personnel
-              </p>
-              <p style={{ margin: '8px 0 0 0', fontSize: '0.9em', opacity: 0.8 }}>
-                🔗 Connecté à l'API Symfony (http://localhost:8001/api)
-              </p>
-              {user && (
-                <p style={{ margin: '12px 0 0 0', fontSize: '0.95em', opacity: 0.95, fontWeight: '600' }}>
-                  👤 Connecté en tant que : <strong>{user.firstName} {user.lastName}</strong>
-                </p>
-              )}
-              {!isAuthenticated && (
-                <p style={{ margin: '12px 0 0 0', fontSize: '0.9em', opacity: 0.9 }}>
-                  Accès public en lecture seule. Connectez-vous pour créer ou modifier des événements.
-                </p>
-              )}
-            </div>
-            {isAuthenticated ? (
-              <button
-                type="button"
-                onClick={logout}
-                style={{
-                  marginLeft: 'auto',
-                  padding: '12px 18px',
-                  background: 'rgba(255,255,255,0.15)',
-                  color: 'white',
-                  border: '2px solid rgba(255,255,255,0.35)',
-                  borderRadius: '10px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  backdropFilter: 'blur(4px)'
-                }}
-              >
-                ↩ Se déconnecter
-              </button>
-            ) : (
-              <Link
-                to="/login"
-                style={{
-                  marginLeft: 'auto',
-                  padding: '12px 18px',
-                  background: 'rgba(255,255,255,0.15)',
-                  color: 'white',
-                  border: '2px solid rgba(255,255,255,0.35)',
-                  borderRadius: '10px',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  backdropFilter: 'blur(4px)'
-                }}
-              >
-                Se connecter
-              </Link>
-            )}
-          </div>
-        </div>
-
-        {error && (
-          <div style={{
-            background: '#ffebee',
-            color: '#c62828',
-            padding: '15px',
-            borderRadius: '5px',
-            marginBottom: '20px',
-            border: '1px solid #ef5350'
-          }}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        <div style={{
-          background: 'white',
-          padding: '20px',
-          borderRadius: '10px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {[
-              { key: 'course', label: 'Cours', color: '#e3f2fd', icon: '🔵' },
-              { key: 'meeting', label: 'Réunion', color: '#e8f5e9', icon: '🟢' },
-              { key: 'exam', label: 'Examen', color: '#ffebee', icon: '🔴' },
-              { key: 'training', label: 'Formation', color: '#fff3e0', icon: '🟠' },
-              { key: 'other', label: 'Autre', color: '#f3e5f5', icon: '🟣' }
-            ].map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setFilterType(filterType === item.key ? null : item.key)}
-                style={{
-                  padding: '10px 16px',
-                  background: filterType === item.key ? item.color : '#fff',
-                  border: filterType === item.key ? `2px solid ${item.color}` : '2px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
-                }}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setFilterType(null)}
-              style={{
-                padding: '10px 16px',
-                background: '#667eea',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-              }}
-            >
-              🔄 Réinitialiser
+      <div className="calendar-layout">
+        {/* Sidebar des agendas */}
+        <aside className="calendar-sidebar">
+          <div className="sidebar-header">
+            <h3>📚 Mes Agendas</h3>
+            <button className="btn-new-calendar" onClick={() => setShowNewCalendarModal(true)}>
+              ➕ Nouvel agenda
             </button>
-            <div style={{ marginLeft: 'auto' }}>
-              <button
-                type="button"
-                onClick={loadEvents}
-                style={{
-                  padding: '12px 18px',
-                  background: '#667eea',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
-                }}
-              >
-                🔁 Recharger
-              </button>
-            </div>
           </div>
-
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            }}
-            events={calendarEvents}
-            dateClick={isAuthenticated ? handleDateClick : undefined}
-            select={isAuthenticated ? handleSelectRange : undefined}
-            eventClick={handleEventClick}
-            eventDrop={isAuthenticated ? handleEventDrop : undefined}
-            eventResize={isAuthenticated ? handleEventResize : undefined}
-            editable={isAuthenticated}
-            selectable={isAuthenticated}
-            selectMirror={true}
-            dayMaxEvents={true}
-            weekends={true}
-            locale="fr"
-            buttonText={{
-              today: "Aujourd'hui",
-              month: 'Mois',
-              week: 'Semaine',
-              day: 'Jour'
-            }}
-            height="auto"
-            slotMinTime="07:00:00"
-            slotMaxTime="19:00:00"
-          />
-
-          <div style={{
-            marginTop: '20px',
-            padding: '15px',
-            background: '#f5f5f5',
-            borderRadius: '5px',
-            fontSize: '0.9em',
-            color: '#666'
-          }}>
-            <p style={{ margin: '5px 0' }}>
-              💡 <strong>Astuce:</strong> Connectez-vous puis cliquez sur une date pour ajouter un événement
-            </p>
-            <p style={{ margin: '5px 0' }}>
-              👁️ <strong>Détails:</strong> Cliquez sur un événement pour voir ses détails
-            </p>
-            <p style={{ margin: '5px 0' }}>
-              ✅ <strong>Statut:</strong> {events.length} événement{events.length > 1 ? 's' : ''} chargé{events.length > 1 ? 's' : ''} depuis Symfony
-            </p>
-            {!isAuthenticated && (
-              <p style={{ margin: '5px 0' }}>
-                🔒 Vous êtes en lecture seule. Connectez-vous pour créer, déplacer ou supprimer des événements.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {showModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }} onClick={() => setShowModal(false)}>
-          <div style={{
-            background: 'white',
-            borderRadius: '15px',
-            maxWidth: '650px',
-            width: '90%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
-          }} onClick={(e) => e.stopPropagation()}>
-            <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              padding: '25px 30px',
-              borderBottom: '3px solid rgba(0,0,0,0.1)'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '1.8em', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span>📝</span>
-                <span>Nouvel événement</span>
-              </h2>
-              <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '0.95em' }}>
-                Remplissez les informations de l'événement
-              </p>
-            </div>
-
-            <form onSubmit={handleFormSubmit} style={{ padding: '30px' }}>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '14px'
-                }}>
-                  <span>✏️</span>
-                  <span>Titre *</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '12px 15px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    transition: 'border-color 0.2s',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#667eea')}
-                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                />
+          
+          <div className="calendars-list">
+            {loadingCalendars ? (
+              <div className="empty-calendars">Chargement...</div>
+            ) : calendars.length === 0 ? (
+              <div className="empty-calendars">
+                <p>Aucun agenda</p>
+                <button className="btn-action primary" onClick={() => setShowNewCalendarModal(true)}>
+                  Créer mon premier agenda
+                </button>
               </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '12px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '14px'
-                }}>
-                  <span>🏷️</span>
-                  <span>Type d'événement</span>
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {[
-                    { value: 'course', icon: '📚', label: 'Cours', color: '#3788d8' },
-                    { value: 'meeting', icon: '👥', label: 'Réunion', color: '#4caf50' },
-                    { value: 'exam', icon: '📝', label: 'Examen', color: '#f44336' },
-                    { value: 'training', icon: '🎓', label: 'Formation', color: '#ff9800' }
-                  ].map(type => (
-                    <button
-                      key={type.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, type: type.value })}
-                      style={{
-                        padding: '12px 15px',
-                        border: formData.type === type.value ? `3px solid ${type.color}` : '2px solid #e0e0e0',
-                        borderRadius: '8px',
-                        background: formData.type === type.value ? `${type.color}15` : '#fff',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s',
-                        color: formData.type === type.value ? type.color : '#333'
-                      }}
-                      onMouseOver={(e) => {
-                        if (formData.type !== type.value) {
-                          e.currentTarget.style.borderColor = type.color
-                          e.currentTarget.style.background = `${type.color}08`
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (formData.type !== type.value) {
-                          e.currentTarget.style.borderColor = '#e0e0e0'
-                          e.currentTarget.style.background = '#fff'
-                        }
-                      }}
+            ) : (
+              <>
+                <div className="calendar-section">
+                  <h4>📌 Personnels</h4>
+                  {calendars.filter(c => c.type === 'personal' || !c.type).map(calendar => (
+                    <div
+                      key={calendar.id}
+                      className={`calendar-item ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
+                      onClick={() => setActiveCalendar(calendar)}
                     >
-                      <span style={{ fontSize: '1.2em' }}>{type.icon}</span>
-                      <span>{type.label}</span>
-                    </button>
+                      <div className="calendar-color-dot" style={{ background: calendar.color }} />
+                      <div className="calendar-item-info">
+                        <div className="calendar-item-name">{calendar.name}</div>
+                        <div className="calendar-item-meta">
+                          {events.filter(e => e.extendedProps?.calendarId === calendar.id).length} événement(s)
+                        </div>
+                      </div>
+                      <div className="calendar-item-actions">
+                        <button 
+                          className="btn-icon" 
+                          title="Partager"
+                          onClick={(e) => { e.stopPropagation(); setActiveCalendar(calendar); setShowShareModal(true); }}
+                        >
+                          📤
+                        </button>
+                        <button 
+                          className="btn-icon danger" 
+                          title="Supprimer"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCalendar(calendar.id); }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, type: 'other' })}
-                  style={{
-                    width: '100%',
-                    marginTop: '10px',
-                    padding: '12px 15px',
-                    border: formData.type === 'other' ? '3px solid #9c27b0' : '2px solid #e0e0e0',
-                    borderRadius: '8px',
-                    background: formData.type === 'other' ? '#9c27b015' : '#fff',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    transition: 'all 0.2s',
-                    color: formData.type === 'other' ? '#9c27b0' : '#333'
-                  }}
-                  onMouseOver={(e) => {
-                    if (formData.type !== 'other') {
-                      e.currentTarget.style.borderColor = '#9c27b0'
-                      e.currentTarget.style.background = '#9c27b008'
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (formData.type !== 'other') {
-                      e.currentTarget.style.borderColor = '#e0e0e0'
-                      e.currentTarget.style.background = '#fff'
-                    }
-                  }}
-                >
-                  <span style={{ fontSize: '1.2em' }}>📌</span>
-                  <span>Autre</span>
-                </button>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '8px',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '14px'
-                  }}>
-                    <span>🕐</span>
-                    <span>Début *</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '12px 15px',
-                      border: '2px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = '#667eea')}
-                    onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                  />
+                {calendars.filter(c => c.type === 'shared').length > 0 && (
+                  <div className="calendar-section">
+                    <h4>👥 Partagés avec moi</h4>
+                    {calendars.filter(c => c.type === 'shared').map(calendar => (
+                      <div
+                        key={calendar.id}
+                        className={`calendar-item ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
+                        onClick={() => setActiveCalendar(calendar)}
+                      >
+                        <div className="calendar-color-dot" style={{ background: calendar.color }} />
+                        <div className="calendar-item-info">
+                          <div className="calendar-item-name">{calendar.name}</div>
+                          <div className="calendar-item-meta">
+                            Par {calendar.owner?.firstName || 'Inconnu'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </aside>
+
+        {/* Contenu principal */}
+        <main className="calendar-main">
+          {activeCalendar ? (
+            <>
+              <div className="calendar-main-header">
+                <div className="active-calendar-info">
+                  <div className="calendar-color-dot" style={{ background: activeCalendar.color }} />
+                  <div>
+                    <h2>{activeCalendar.name}</h2>
+                    {activeCalendar.description && <span>{activeCalendar.description}</span>}
+                  </div>
                 </div>
-                <div>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '8px',
-                    fontWeight: '600',
-                    color: '#333',
-                    fontSize: '14px'
+                <div className="calendar-actions">
+                  <button className="btn-action secondary" onClick={openEditCalendarModal}>
+                    ✏️ Modifier
+                  </button>
+                  <button className="btn-action secondary" onClick={() => setShowShareModal(true)}>
+                    📤 Partager
+                  </button>
+                  <button className="btn-action primary" onClick={() => {
+                    const now = new Date()
+                    const start = now.toISOString().slice(0, 16)
+                    const end = new Date(now.getTime() + 3600000).toISOString().slice(0, 16)
+                    setFormData({ ...defaultFormData, startDate: start, endDate: end })
+                    setShowEventModal(true)
                   }}>
-                    <span>🕐</span>
-                    <span>Fin *</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '12px 15px',
-                      border: '2px solid #e0e0e0',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = '#667eea')}
-                    onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                  />
+                    ➕ Nouvel événement
+                  </button>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '14px'
-                }}>
-                  <span>📍</span>
-                  <span>Lieu</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '12px 15px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    outline: 'none'
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#667eea')}
-                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                />
+              <div className="filters-bar">
+                {[
+                  { key: 'course', label: 'Cours', icon: '📚' },
+                  { key: 'meeting', label: 'Réunion', icon: '👥' },
+                  { key: 'exam', label: 'Examen', icon: '📝' },
+                  { key: 'training', label: 'Formation', icon: '🎓' },
+                  { key: 'other', label: 'Autre', icon: '📌' }
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    className={`filter-btn ${filterType === item.key ? 'active' : ''}`}
+                    onClick={() => setFilterType(filterType === item.key ? null : item.key)}
+                  >
+                    {item.icon} {item.label}
+                  </button>
+                ))}
+                <button className="filter-reset" onClick={() => setFilterType(null)}>
+                  🔄 Tous
+                </button>
               </div>
 
-              <div style={{ marginBottom: '25px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '8px',
-                  fontWeight: '600',
-                  color: '#333',
-                  fontSize: '14px'
-                }}>
-                  <span>💬</span>
-                  <span>Description</span>
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows="4"
-                  style={{
-                    width: '100%',
-                    padding: '12px 15px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                    lineHeight: '1.5'
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#667eea')}
-                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                />
-              </div>
+              <FullCalendar
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                initialView="dayGridMonth"
+                headerToolbar={{
+                  left: 'prev,next today',
+                  center: 'title',
+                  right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                }}
+                events={filteredEvents}
+                dateClick={handleDateClick}
+                select={handleSelectRange}
+                eventClick={handleEventClick}
+                eventDrop={handleEventDrop}
+                eventResize={handleEventResize}
+                editable={true}
+                selectable={true}
+                selectMirror={true}
+                dayMaxEvents={true}
+                weekends={true}
+                locale="fr"
+                buttonText={{
+                  today: "Aujourd'hui",
+                  month: 'Mois',
+                  week: 'Semaine',
+                  day: 'Jour'
+                }}
+                height="auto"
+                slotMinTime="07:00:00"
+                slotMaxTime="19:00:00"
+              />
 
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'flex-end',
-                paddingTop: '20px',
-                borderTop: '2px solid #f0f0f0'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    padding: '12px 28px',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '15px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.background = '#5a6268'
-                    e.target.style.transform = 'translateY(-1px)'
-                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.background = '#6c757d'
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = 'none'
-                  }}
-                >
-                  ✕ Annuler
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '12px 28px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    fontSize: '15px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.transform = 'translateY(-1px)'
-                    e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)'
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.transform = 'translateY(0)'
-                    e.target.style.boxShadow = 'none'
-                  }}
-                >
-                  ✓ Créer l'événement
-                </button>
+              <div className="calendar-tips">
+                <p>💡 <strong>Astuce:</strong> Cliquez sur une date pour créer un événement</p>
+                <p>✅ <strong>Statut:</strong> {filteredEvents.length} événement(s) affiché(s)</p>
+              </div>
+            </>
+          ) : (
+            <div className="no-calendar-selected">
+              <div className="icon">📅</div>
+              <h3>Aucun agenda sélectionné</h3>
+              <p>Sélectionnez un agenda dans la barre latérale ou créez-en un nouveau</p>
+              <button className="btn-action primary" onClick={() => setShowNewCalendarModal(true)} style={{ marginTop: '20px' }}>
+                ➕ Créer un agenda
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Modal: Nouvel agenda */}
+      {showNewCalendarModal && (
+        <div className="modal-overlay" onClick={() => setShowNewCalendarModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📚 Nouvel agenda</h2>
+              <p>Créez un nouvel agenda pour organiser vos événements</p>
+            </div>
+            <form onSubmit={handleCreateCalendar}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Nom de l'agenda *</label>
+                  <input
+                    type="text"
+                    required
+                    value={calendarFormData.name}
+                    onChange={e => setCalendarFormData({ ...calendarFormData, name: e.target.value })}
+                    placeholder="Ex: Cours BTS SIO"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={calendarFormData.description}
+                    onChange={e => setCalendarFormData({ ...calendarFormData, description: e.target.value })}
+                    placeholder="Description optionnelle"
+                    rows={3}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Couleur</label>
+                  <div className="color-picker">
+                    {calendarColors.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-option ${calendarFormData.color === color ? 'active' : ''}`}
+                        style={{ background: color }}
+                        onClick={() => setCalendarFormData({ ...calendarFormData, color })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-body">
+                <div className="modal-actions">
+                  <button type="button" className="btn-cancel" onClick={() => setShowNewCalendarModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-submit">
+                    ✓ Créer
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {showDetailsModal && selectedEvent && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }} onClick={() => setShowDetailsModal(false)}>
-          <div style={{
-            background: 'white',
-            padding: '0',
-            borderRadius: '15px',
-            maxWidth: '600px',
-            width: '90%',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-            overflow: 'hidden'
-          }} onClick={(e) => e.stopPropagation()}>
-            <div style={{
-              background: selectedEvent.backgroundColor || '#667eea',
-              color: 'white',
-              padding: '25px 30px',
-              borderBottom: '3px solid rgba(0,0,0,0.1)'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '1.8em', fontWeight: 'bold' }}>
-                {selectedEvent.title}
-              </h2>
+      {/* Modal: Modifier agenda */}
+      {showEditCalendarModal && (
+        <div className="modal-overlay" onClick={() => setShowEditCalendarModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>✏️ Modifier l'agenda</h2>
             </div>
-
-            <div style={{ padding: '30px' }}>
-              <div style={{ marginBottom: '25px' }}>
-                <div style={{
-                  display: 'grid',
-                  gap: '20px',
-                  gridTemplateColumns: '1fr'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '15px',
-                    padding: '15px',
-                    background: '#f8f9fa',
-                    borderRadius: '8px',
-                    borderLeft: '4px solid ' + (selectedEvent.backgroundColor || '#667eea')
-                  }}>
-                    <span style={{ fontSize: '1.5em' }}>🕐</span>
-                    <div>
-                      <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}>Horaires</div>
-                      <div style={{ color: '#666' }}>
-                        <div>Début: {selectedEvent.start.toLocaleString('fr-FR', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}</div>
-                        {selectedEvent.end && (
-                          <div>Fin: {selectedEvent.end.toLocaleString('fr-FR', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}</div>
-                        )}
-                      </div>
-                    </div>
+            <form onSubmit={handleUpdateCalendar}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Nom de l'agenda *</label>
+                  <input
+                    type="text"
+                    required
+                    value={calendarFormData.name}
+                    onChange={e => setCalendarFormData({ ...calendarFormData, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={calendarFormData.description}
+                    onChange={e => setCalendarFormData({ ...calendarFormData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Couleur</label>
+                  <div className="color-picker">
+                    {calendarColors.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={`color-option ${calendarFormData.color === color ? 'active' : ''}`}
+                        style={{ background: color }}
+                        onClick={() => setCalendarFormData({ ...calendarFormData, color })}
+                      />
+                    ))}
                   </div>
+                </div>
+              </div>
+              <div className="modal-body">
+                <div className="modal-actions">
+                  <button type="button" className="btn-cancel" onClick={() => setShowEditCalendarModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-submit">
+                    💾 Enregistrer
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-                  {selectedEvent.extendedProps?.type && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '15px',
-                      padding: '15px',
-                      background: '#f8f9fa',
-                      borderRadius: '8px',
-                      borderLeft: '4px solid ' + (selectedEvent.backgroundColor || '#667eea')
-                    }}>
-                      <span style={{ fontSize: '1.5em' }}>
-                        {selectedEvent.extendedProps.type === 'course' ? '📚' :
-                        selectedEvent.extendedProps.type === 'meeting' ? '👥' :
-                        selectedEvent.extendedProps.type === 'exam' ? '📝' :
-                        selectedEvent.extendedProps.type === 'training' ? '🎓' : '📌'}
-                      </span>
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}>Type</div>
-                        <div style={{ color: '#666' }}>
-                          {selectedEvent.extendedProps.type === 'course' ? 'Cours' :
-                          selectedEvent.extendedProps.type === 'meeting' ? 'Réunion' :
-                          selectedEvent.extendedProps.type === 'exam' ? 'Examen' :
-                          selectedEvent.extendedProps.type === 'training' ? 'Formation' : 'Autre'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedEvent.extendedProps?.location && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '15px',
-                      padding: '15px',
-                      background: '#f8f9fa',
-                      borderRadius: '8px',
-                      borderLeft: '4px solid ' + (selectedEvent.backgroundColor || '#667eea')
-                    }}>
-                      <span style={{ fontSize: '1.5em' }}>📍</span>
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}>Lieu</div>
-                        <div style={{ color: '#666' }}>{selectedEvent.extendedProps.location}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedEvent.extendedProps?.description && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '15px',
-                      padding: '15px',
-                      background: '#f8f9fa',
-                      borderRadius: '8px',
-                      borderLeft: '4px solid ' + (selectedEvent.backgroundColor || '#667eea')
-                    }}>
-                      <span style={{ fontSize: '1.5em' }}>💬</span>
-                      <div>
-                        <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}>Description</div>
-                        <div style={{ color: '#666', lineHeight: '1.5' }}>{selectedEvent.extendedProps.description}</div>
-                      </div>
-                    </div>
-                  )}
+      {/* Modal: Partager agenda */}
+      {showShareModal && activeCalendar && (
+        <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📤 Partager "{activeCalendar.name}"</h2>
+              <p>Invitez des personnes à accéder à cet agenda</p>
+            </div>
+            <div className="modal-body">
+              <div className="share-section">
+                <h4>Ajouter une personne</h4>
+                <div className="share-input-group">
+                  <input
+                    type="email"
+                    placeholder="Email de la personne"
+                    value={shareEmail}
+                    onChange={e => setShareEmail(e.target.value)}
+                  />
+                  <select value={sharePermission} onChange={e => setSharePermission(e.target.value)}>
+                    <option value="Consultation">Lecture</option>
+                    <option value="Modification">Modification</option>
+                    <option value="Administration">Admin</option>
+                  </select>
+                  <button type="button" className="btn-add-share" onClick={handleAddShare}>
+                    ➕
+                  </button>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '20px', borderTop: '1px solid #e0e0e0' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowDetailsModal(false)}
-                  style={{
-                    padding: '12px 24px',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = '#5a6268')}
-                  onMouseOut={(e) => (e.target.style.background = '#6c757d')}
-                >
+              {sharedUsers.length > 0 && (
+                <div className="share-section">
+                  <h4>Personnes ayant accès</h4>
+                  <div className="shared-users-list">
+                    {sharedUsers.map((user, index) => (
+                      <div key={index} className="shared-user-item">
+                        <div className="shared-user-info">
+                          <div className="shared-user-avatar">
+                            {user.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="shared-user-details">
+                            <div className="shared-user-email">{user.email}</div>
+                            <div className="shared-user-permission">{user.permission}</div>
+                          </div>
+                        </div>
+                        <button 
+                          className="btn-remove-share" 
+                          onClick={() => handleRemoveShare(user.email)}
+                          title="Retirer l'accès"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowShareModal(false)}>
                   Fermer
                 </button>
-                {isAuthenticated ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleEditEvent}
-                      style={{
-                        padding: '12px 24px',
-                        background: '#0d6efd',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '14px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseOver={(e) => (e.target.style.background = '#0b5ed7')}
-                      onMouseOut={(e) => (e.target.style.background = '#0d6efd')}
-                    >
-                      ✏️ Modifier
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeleteEvent}
-                      style={{
-                        padding: '12px 24px',
-                        background: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '14px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseOver={(e) => (e.target.style.background = '#c82333')}
-                      onMouseOut={(e) => (e.target.style.background = '#dc3545')}
-                    >
-                      🗑️ Supprimer
-                    </button>
-                  </>
-                ) : (
-                  <span style={{ alignSelf: 'center', color: '#6c757d', fontWeight: 600 }}>
-                    Connectez-vous pour modifier ou supprimer cet événement.
-                  </span>
-                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {showEditModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: 'rgba(0, 0, 0, 0.6)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 1000
-          }}
-          onClick={() => setShowEditModal(false)}
-        >
-          <div
-            style={{
-              background: 'white',
-              borderRadius: '12px',
-              padding: '30px',
-              width: '90%',
-              maxWidth: '500px',
-              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
-              maxHeight: '90vh',
-              overflowY: 'auto'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0, marginBottom: '25px', color: '#333', fontSize: '24px' }}>
-              Modifier l'événement
-            </h2>
-
-            <form onSubmit={handleUpdateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>
-                  Titre
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#0d6efd')}
-                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>
-                    Date début
-                  </label>
+      {/* Modal: Nouvel événement */}
+      {showEventModal && (
+        <div className="modal-overlay" onClick={() => setShowEventModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📝 Nouvel événement</h2>
+              <p>Agenda: {activeCalendar?.name}</p>
+            </div>
+            <form onSubmit={handleCreateEvent}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Titre *</label>
                   <input
-                    type="datetime-local"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '2px solid #e0e0e0',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      boxSizing: 'border-box',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = '#0d6efd')}
-                    onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="Titre de l'événement"
                   />
                 </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>
-                    Date fin
-                  </label>
+                <div className="form-group">
+                  <label>Type</label>
+                  <div className="color-picker">
+                    {['course', 'meeting', 'exam', 'training', 'other'].map(type => {
+                      const info = getTypeInfo(type)
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          className={`filter-btn ${formData.type === type ? 'active' : ''}`}
+                          style={{ 
+                            borderColor: formData.type === type ? info.color : '#e0e0e0',
+                            background: formData.type === type ? `${info.color}15` : 'white'
+                          }}
+                          onClick={() => setFormData({ ...formData, type })}
+                        >
+                          {info.icon} {info.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  <div className="form-group">
+                    <label>Début *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={formData.startDate}
+                      onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Fin *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={formData.endDate}
+                      onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Lieu</label>
                   <input
-                    type="datetime-local"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      border: '2px solid #e0e0e0',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      boxSizing: 'border-box',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = '#0d6efd')}
-                    onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
+                    type="text"
+                    value={formData.location}
+                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="Lieu de l'événement"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                    placeholder="Description optionnelle"
                   />
                 </div>
               </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '12px', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>
-                  Type
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  {['course', 'meeting', 'exam', 'training', 'other'].map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, type })}
-                      style={{
-                        padding: '10px 12px',
-                        background: formData.type === type ? '#0d6efd' : '#f0f0f0',
-                        color: formData.type === type ? 'white' : '#333',
-                        border: formData.type === type ? '2px solid #0d6efd' : '2px solid #e0e0e0',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: formData.type === type ? 'bold' : 'normal',
-                        fontSize: '12px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {type === 'course' ? '📚 Cours' : type === 'meeting' ? '👥 Réunion' : type === 'exam' ? '📝 Examen' : type === 'training' ? '🎓 Formation' : '📌 Autre'}
-                    </button>
-                  ))}
+              <div className="modal-body">
+                <div className="modal-actions">
+                  <button type="button" className="btn-cancel" onClick={() => setShowEventModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-submit">
+                    ✓ Créer
+                  </button>
                 </div>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>
-                  Lieu
-                </label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
-                    transition: 'border-color 0.2s'
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#0d6efd')}
-                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                />
+      {/* Modal: Détails événement */}
+      {showDetailsModal && selectedEvent && (
+        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ background: selectedEvent.backgroundColor || '#667eea' }}>
+              <h2>{selectedEvent.title}</h2>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '1.3em' }}>🕐</span>
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#333' }}>Horaires</div>
+                    <div style={{ color: '#666', fontSize: '0.9em' }}>
+                      {selectedEvent.start?.toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                      {selectedEvent.end && ` - ${selectedEvent.end.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                    </div>
+                  </div>
+                </div>
+                
+                {selectedEvent.extendedProps?.type && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '1.3em' }}>{getTypeInfo(selectedEvent.extendedProps.type).icon}</span>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#333' }}>Type</div>
+                      <div style={{ color: '#666', fontSize: '0.9em' }}>{getTypeInfo(selectedEvent.extendedProps.type).label}</div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.extendedProps?.location && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '1.3em' }}>📍</span>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#333' }}>Lieu</div>
+                      <div style={{ color: '#666', fontSize: '0.9em' }}>{selectedEvent.extendedProps.location}</div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.extendedProps?.description && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '1.3em' }}>💬</span>
+                    <div>
+                      <div style={{ fontWeight: '600', color: '#333' }}>Description</div>
+                      <div style={{ color: '#666', fontSize: '0.9em', lineHeight: '1.5' }}>{selectedEvent.extendedProps.description}</div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555', fontSize: '14px' }}>
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows="4"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '2px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
-                    fontFamily: 'inherit',
-                    transition: 'border-color 0.2s',
-                    resize: 'vertical'
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#0d6efd')}
-                  onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
-                />
+              <div className="modal-actions" style={{ marginTop: '25px' }}>
+                <button type="button" className="btn-cancel" onClick={() => setShowDetailsModal(false)}>
+                  Fermer
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-submit" 
+                  style={{ background: '#0d6efd' }}
+                  onClick={handleEditEvent}
+                >
+                  ✏️ Modifier
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-cancel" 
+                  style={{ background: '#dc3545' }}
+                  onClick={handleDeleteEvent}
+                >
+                  🗑️ Supprimer
+                </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '25px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  style={{
-                    flex: 1,
-                    padding: '12px 24px',
-                    background: '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = '#5a6268')}
-                  onMouseOut={(e) => (e.target.style.background = '#6c757d')}
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    flex: 1,
-                    padding: '12px 24px',
-                    background: '#28a745',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '14px',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseOver={(e) => (e.target.style.background = '#218838')}
-                  onMouseOut={(e) => (e.target.style.background = '#28a745')}
-                >
-                  💾 Enregistrer
-                </button>
+      {/* Modal: Modifier événement */}
+      {showEditEventModal && (
+        <div className="modal-overlay" onClick={() => setShowEditEventModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>✏️ Modifier l'événement</h2>
+            </div>
+            <form onSubmit={handleUpdateEvent}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Titre *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Type</label>
+                  <div className="color-picker">
+                    {['course', 'meeting', 'exam', 'training', 'other'].map(type => {
+                      const info = getTypeInfo(type)
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          className={`filter-btn ${formData.type === type ? 'active' : ''}`}
+                          style={{ 
+                            borderColor: formData.type === type ? info.color : '#e0e0e0',
+                            background: formData.type === type ? `${info.color}15` : 'white'
+                          }}
+                          onClick={() => setFormData({ ...formData, type })}
+                        >
+                          {info.icon} {info.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  <div className="form-group">
+                    <label>Début *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={formData.startDate}
+                      onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Fin *</label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={formData.endDate}
+                      onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Lieu</label>
+                  <input
+                    type="text"
+                    value={formData.location}
+                    onChange={e => setFormData({ ...formData, location: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="modal-body">
+                <div className="modal-actions">
+                  <button type="button" className="btn-cancel" onClick={() => setShowEditEventModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn-submit">
+                    💾 Enregistrer
+                  </button>
+                </div>
               </div>
             </form>
           </div>

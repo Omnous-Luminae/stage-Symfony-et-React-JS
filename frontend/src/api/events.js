@@ -36,7 +36,10 @@ export const calendarService = {
   // Obtenir les permissions d'un calendrier
   getPermissions: (id) => api.get(`/calendars/${id}/permissions`),
 
-  // Supprimer une permission
+  // Supprimer une permission par ID
   removePermission: (calendarId, permissionId) => api.delete(`/calendars/${calendarId}/permissions/${permissionId}`),
+
+  // Supprimer un partage par email
+  removeShare: (calendarId, email) => api.delete(`/calendars/${calendarId}/share`, { data: { email } }),
 };
 

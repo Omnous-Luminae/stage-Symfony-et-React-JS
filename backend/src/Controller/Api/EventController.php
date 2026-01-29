@@ -5,7 +5,9 @@ namespace App\Controller\Api;
 use App\Entity\Event;
 use App\Entity\Calendar;
 use App\Entity\User;
+use App\Repository\CalendarPermissionRepository;
 use App\Repository\EventRepository;
+use App\Service\SessionUserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -58,14 +60,73 @@ class EventController extends AbstractController
     }
 
     #[Route('/events', name: 'events_list', methods: ['GET'])]
-    public function list(EventRepository $eventRepository): JsonResponse
-    {
-        // Récupérer les événements de la base de données
-        $dbEvents = $eventRepository->findAll();
-        
-        // Convertir les entités en format FullCalendar
+    public function list(
+        Request $request,
+        EventRepository $eventRepository,
+        EntityManagerInterface $entityManager,
+        CalendarPermissionRepository $permissionRepository,
+        SessionUserService $sessionUserService
+    ): JsonResponse {
+        $user = $sessionUserService->getCurrentUser();
+
+        // Parse pagination
+        $limit = (int) ($request->query->get('limit', 100));
+        $limit = max(1, min($limit, 500));
+        $offset = max(0, (int) ($request->query->get('offset', 0)));
+
+        // Parse dates
+        $startDate = null;
+        $endDate = null;
+        $startParam = $request->query->get('start');
+        $endParam = $request->query->get('end');
+
+        try {
+            if ($startParam) {
+                $startDate = new \DateTime($startParam);
+            }
+            if ($endParam) {
+                $endDate = new \DateTime($endParam);
+            }
+        } catch (\Exception $e) {
+            return $this->json(['error' => 'Invalid date format'], 400);
+        }
+
+        // Calendar filter + access check
+        $calendar = null;
+        $calendarId = $request->query->get('calendarId');
+        if ($calendarId) {
+            $calendar = $entityManager->getRepository(Calendar::class)->find($calendarId);
+            if (!$calendar) {
+                return $this->json(['error' => 'Calendar not found'], 404);
+            }
+
+            // Access control for non-public calendars
+            if (!$calendar->isPublic()) {
+                if (!$user instanceof User) {
+                    return $this->json(['error' => 'Authentication required for this calendar'], 403);
+                }
+
+                $isOwner = $calendar->getOwner() && $calendar->getOwner()->getId() === $user->getId();
+                $hasPermission = (bool) $permissionRepository->findPermission($calendar, $user);
+
+                if (!$isOwner && !$hasPermission && !$this->isGranted('ROLE_ADMIN')) {
+                    return $this->json(['error' => 'Unauthorized for this calendar'], 403);
+                }
+            }
+        }
+
+        // Récupérer les événements filtrés par accès et plage de dates
+        $eventsEntities = $eventRepository->findAccessible(
+            $calendar,
+            $startDate,
+            $endDate,
+            $user instanceof User ? $user : null,
+            $limit,
+            $offset
+        );
+
         $events = [];
-        foreach ($dbEvents as $event) {
+        foreach ($eventsEntities as $event) {
             $events[] = $this->eventToArray($event);
         }
 
@@ -261,6 +322,54 @@ class EventController extends AbstractController
                 'calendarName' => $calendar ? $calendar->getName() : 'Événement général'
             ]
         ];
+    }
+
+    #[Route('/debug', name: 'debug', methods: ['GET'])]
+    public function debug(
+        EntityManagerInterface $entityManager,
+        EventRepository $eventRepository
+    ): JsonResponse {
+        $user = $this->getUser();
+        
+        // Infos utilisateur
+        $debug = [
+            'user' => $user instanceof User ? [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'authenticated' => true
+            ] : [
+                'authenticated' => false
+            ]
+        ];
+        
+        // Tous les calendriers
+        $allCalendars = $entityManager->getRepository(Calendar::class)->findAll();
+        $debug['calendars'] = [];
+        foreach ($allCalendars as $cal) {
+            $debug['calendars'][] = [
+                'id' => $cal->getId(),
+                'name' => $cal->getName(),
+                'public' => $cal->isPublic(),
+                'owner_id' => $cal->getOwner() ? $cal->getOwner()->getId() : null,
+                'owner_email' => $cal->getOwner() ? $cal->getOwner()->getEmail() : null
+            ];
+        }
+        
+        // Tous les événements (brut)
+        $allEvents = $entityManager->getRepository(Event::class)->findAll();
+        $debug['total_events_in_db'] = count($allEvents);
+        $debug['events'] = [];
+        foreach ($allEvents as $evt) {
+            $debug['events'][] = [
+                'id' => $evt->getId(),
+                'title' => $evt->getTitle(),
+                'calendar_id' => $evt->getCalendar() ? $evt->getCalendar()->getId() : null,
+                'calendar_name' => $evt->getCalendar() ? $evt->getCalendar()->getName() : null,
+                'calendar_public' => $evt->getCalendar() ? $evt->getCalendar()->isPublic() : null
+            ];
+        }
+        
+        return $this->json($debug);
     }
 
     #[Route('/calendars', name: 'calendars_list', methods: ['GET'])]
