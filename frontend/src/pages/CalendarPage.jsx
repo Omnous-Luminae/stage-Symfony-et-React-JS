@@ -286,24 +286,66 @@ function CalendarPage() {
         email: shareEmail,
         permission: sharePermission
       })
-      setSharedUsers(prev => [...prev, { email: shareEmail, permission: sharePermission }])
-      setShareEmail('')
       showSuccess(`Agenda partagé avec ${shareEmail}`)
+      setShareEmail('')
+      // Recharger la liste pour avoir les infos complètes
+      await loadSharedUsers(activeCalendar.id)
     } catch (err) {
       console.error('Erreur partage:', err)
       showError(err?.response?.data?.error || 'Erreur lors du partage')
     }
   }
 
-  const handleRemoveShare = async (email) => {
+  const handleRemoveShare = async (permissionId) => {
     if (!activeCalendar) return
+    if (!permissionId) {
+      console.error('Permission ID manquant')
+      showError('Erreur: ID de permission manquant')
+      return
+    }
     try {
-      await calendarService.removeShare(activeCalendar.id, email)
-      setSharedUsers(prev => prev.filter(u => u.email !== email))
+      console.log(`Suppression permission ${permissionId} du calendrier ${activeCalendar.id}`)
+      await calendarService.removePermission(activeCalendar.id, permissionId)
       showSuccess('Partage supprimé')
+      // Recharger la liste
+      await loadSharedUsers(activeCalendar.id)
     } catch (err) {
       console.error('Erreur suppression partage:', err)
       showError('Erreur lors de la suppression du partage')
+    }
+  }
+
+  // Charger les utilisateurs avec qui le calendrier est partagé
+  const loadSharedUsers = async (calendarId) => {
+    try {
+      const response = await calendarService.getPermissions(calendarId)
+      const permissions = response.data || []
+      console.log('Permissions reçues:', permissions)
+      setSharedUsers(permissions.map(p => ({
+        id: p.id,
+        email: p.user?.email,
+        firstName: p.user?.firstName,
+        lastName: p.user?.lastName,
+        permission: p.permission
+      })))
+    } catch (err) {
+      console.error('Erreur chargement permissions:', err)
+      setSharedUsers([])
+    }
+  }
+
+  // Ouvrir le modal de partage
+  const openShareModal = async (calendar) => {
+    setActiveCalendar(calendar)
+    setShareEmail('')
+    setSharePermission('Consultation')
+    setSharedUsers([])
+    setShowShareModal(true)
+    // Charger les utilisateurs partagés en arrière-plan
+    try {
+      await loadSharedUsers(calendar.id)
+    } catch (err) {
+      console.error('Erreur chargement permissions:', err)
     }
   }
 
@@ -598,7 +640,7 @@ function CalendarPage() {
                           <button 
                             className="btn-icon" 
                             title="Partager"
-                            onClick={(e) => { e.stopPropagation(); setActiveCalendar(calendar); setShowShareModal(true); }}
+                            onClick={(e) => { e.stopPropagation(); openShareModal(calendar); }}
                           >
                             📤
                           </button>
@@ -659,7 +701,7 @@ function CalendarPage() {
                   <button className="btn-action secondary" onClick={openEditCalendarModal}>
                     ✏️ Modifier
                   </button>
-                  <button className="btn-action secondary" onClick={() => setShowShareModal(true)}>
+                  <button className="btn-action secondary" onClick={() => openShareModal(activeCalendar)}>
                     📤 Partager
                   </button>
                   <button className="btn-action primary" onClick={() => {
@@ -864,65 +906,97 @@ function CalendarPage() {
       {/* Modal: Partager agenda */}
       {showShareModal && activeCalendar && (
         <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content share-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>📤 Partager "{activeCalendar.name}"</h2>
-              <p>Invitez des personnes à accéder à cet agenda</p>
+              <button className="modal-close" onClick={() => setShowShareModal(false)}>×</button>
             </div>
             <div className="modal-body">
-              <div className="share-section">
-                <h4>Ajouter une personne</h4>
-                <div className="share-input-group">
-                  <input
-                    type="email"
-                    placeholder="Email de la personne"
-                    value={shareEmail}
-                    onChange={e => setShareEmail(e.target.value)}
-                  />
-                  <select value={sharePermission} onChange={e => setSharePermission(e.target.value)}>
-                    <option value="Consultation">Lecture</option>
-                    <option value="Modification">Modification</option>
-                    <option value="Administration">Admin</option>
-                  </select>
-                  <button type="button" className="btn-add-share" onClick={handleAddShare}>
-                    ➕
+              {/* Section: Ajouter une personne */}
+              <div className="share-section share-add-section">
+                <h4>➕ Ajouter une personne</h4>
+                <div className="share-form">
+                  <div className="share-input-row">
+                    <div className="share-input-field">
+                      <label>Email</label>
+                      <input
+                        type="email"
+                        placeholder="exemple@email.com"
+                        value={shareEmail}
+                        onChange={e => setShareEmail(e.target.value)}
+                        onKeyPress={e => e.key === 'Enter' && handleAddShare()}
+                      />
+                    </div>
+                    <div className="share-input-field share-permission-field">
+                      <label>Permission</label>
+                      <select value={sharePermission} onChange={e => setSharePermission(e.target.value)}>
+                        <option value="Consultation">👁️ Lecture seule</option>
+                        <option value="Modification">✏️ Modification</option>
+                        <option value="Administration">👑 Administration</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-share-add" 
+                    onClick={handleAddShare}
+                    disabled={!shareEmail}
+                  >
+                    <span>➕</span> Inviter
                   </button>
                 </div>
               </div>
 
-              {sharedUsers.length > 0 && (
-                <div className="share-section">
-                  <h4>Personnes ayant accès</h4>
+              {/* Section: Personnes ayant accès */}
+              <div className="share-section share-users-section">
+                <h4>👥 Personnes ayant accès ({sharedUsers.length})</h4>
+                {sharedUsers.length === 0 ? (
+                  <div className="share-empty">
+                    <span className="share-empty-icon">🔒</span>
+                    <p>Cet agenda n'est partagé avec personne</p>
+                    <span className="share-empty-hint">Invitez des personnes pour collaborer</span>
+                  </div>
+                ) : (
                   <div className="shared-users-list">
                     {sharedUsers.map((user, index) => (
-                      <div key={index} className="shared-user-item">
+                      <div key={user.id || index} className="shared-user-card">
+                        <div className="shared-user-avatar">
+                          {user.firstName 
+                            ? user.firstName.charAt(0).toUpperCase() 
+                            : (user.email ? user.email.charAt(0).toUpperCase() : '?')}
+                          {user.lastName ? user.lastName.charAt(0).toUpperCase() : ''}
+                        </div>
                         <div className="shared-user-info">
-                          <div className="shared-user-avatar">
-                            {user.email.charAt(0).toUpperCase()}
+                          <div className="shared-user-name">
+                            {user.firstName && user.lastName 
+                              ? `${user.firstName} ${user.lastName}` 
+                              : (user.email || 'Utilisateur inconnu')}
                           </div>
-                          <div className="shared-user-details">
-                            <div className="shared-user-email">{user.email}</div>
-                            <div className="shared-user-permission">{user.permission}</div>
+                          {user.firstName && user.email && <div className="shared-user-email">{user.email}</div>}
+                          <div className={`shared-user-badge permission-${user.permission?.toLowerCase() || 'consultation'}`}>
+                            {user.permission === 'Consultation' && '👁️ Lecture'}
+                            {user.permission === 'Modification' && '✏️ Modification'}
+                            {user.permission === 'Administration' && '👑 Admin'}
+                            {!user.permission && '👁️ Lecture'}
                           </div>
                         </div>
                         <button 
                           className="btn-remove-share" 
-                          onClick={() => handleRemoveShare(user.email)}
+                          onClick={() => handleRemoveShare(user.id)}
                           title="Retirer l'accès"
                         >
-                          ✕
+                          <span>🗑️</span>
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowShareModal(false)}>
-                  Fermer
-                </button>
+                )}
               </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-close-share" onClick={() => setShowShareModal(false)}>
+                Fermer
+              </button>
             </div>
           </div>
         </div>

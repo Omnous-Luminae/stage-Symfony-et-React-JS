@@ -20,11 +20,15 @@ function AdminPage() {
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
   const [admins, setAdmins] = useState([])
-  const [logs, setLogs] = useState([])
-  const [logsPagination, setLogsPagination] = useState({ page: 1, totalPages: 1, total: 0 })
+  
+  // Logs state - separated by category
+  const [userLogs, setUserLogs] = useState([])
+  const [userLogsPagination, setUserLogsPagination] = useState({ page: 1, totalPages: 1, total: 0 })
+  const [calendarLogs, setCalendarLogs] = useState([])
+  const [calendarLogsPagination, setCalendarLogsPagination] = useState({ page: 1, totalPages: 1, total: 0 })
+  
   const [logsFilters, setLogsFilters] = useState({
     action: '',
-    entityType: '',
     dateFrom: '',
     dateTo: ''
   })
@@ -54,6 +58,10 @@ function AdminPage() {
     canManagePermissions: false,
     canViewAuditLogs: true
   })
+  
+  // Log details modal state
+  const [showLogDetailsModal, setShowLogDetailsModal] = useState(false)
+  const [selectedLog, setSelectedLog] = useState(null)
 
   // Check admin status
   useEffect(() => {
@@ -105,19 +113,37 @@ function AdminPage() {
     }
   }, [])
 
-  const loadLogs = useCallback(async (page = 1) => {
+  // Load user logs (user + administrator entities)
+  const loadUserLogs = useCallback(async (page = 1) => {
     try {
-      const params = new URLSearchParams({ page, limit: 30 })
+      const params = new URLSearchParams({ page, limit: 20 })
+      params.append('entityType', 'user,administrator')
       if (logsFilters.action) params.append('action', logsFilters.action)
-      if (logsFilters.entityType) params.append('entityType', logsFilters.entityType)
       if (logsFilters.dateFrom) params.append('dateFrom', logsFilters.dateFrom)
       if (logsFilters.dateTo) params.append('dateTo', logsFilters.dateTo)
       
       const response = await api.get(`/admin/logs?${params.toString()}`)
-      setLogs(response.data.data)
-      setLogsPagination(response.data.pagination)
+      setUserLogs(response.data.data)
+      setUserLogsPagination(response.data.pagination)
     } catch (error) {
-      console.error('Error loading logs:', error)
+      console.error('Error loading user logs:', error)
+    }
+  }, [logsFilters])
+
+  // Load calendar/event logs
+  const loadCalendarLogs = useCallback(async (page = 1) => {
+    try {
+      const params = new URLSearchParams({ page, limit: 20 })
+      params.append('entityType', 'calendar,event')
+      if (logsFilters.action) params.append('action', logsFilters.action)
+      if (logsFilters.dateFrom) params.append('dateFrom', logsFilters.dateFrom)
+      if (logsFilters.dateTo) params.append('dateTo', logsFilters.dateTo)
+      
+      const response = await api.get(`/admin/logs?${params.toString()}`)
+      setCalendarLogs(response.data.data)
+      setCalendarLogsPagination(response.data.pagination)
+    } catch (error) {
+      console.error('Error loading calendar logs:', error)
     }
   }, [logsFilters])
 
@@ -127,10 +153,11 @@ function AdminPage() {
       loadUsers()
       loadAdmins()
       if (adminPermissions.canViewAuditLogs) {
-        loadLogs()
+        loadUserLogs()
+        loadCalendarLogs()
       }
     }
-  }, [isAdmin, loadStats, loadUsers, loadAdmins, loadLogs, adminPermissions.canViewAuditLogs])
+  }, [isAdmin, loadStats, loadUsers, loadAdmins, loadUserLogs, loadCalendarLogs, adminPermissions.canViewAuditLogs])
 
   // Filtered users
   const filteredUsers = users.filter(user => {
@@ -246,6 +273,47 @@ function AdminPage() {
     } catch (error) {
       showError(error.response?.data?.error || 'Erreur')
     }
+  }
+
+  // Undo action from logs
+  const handleUndoAction = async (log, logType) => {
+    const actionLabels = {
+      create: 'la création',
+      update: 'la modification',
+      delete: 'la suppression'
+    }
+    const actionLabel = actionLabels[log.action] || log.action
+    
+    if (!confirm(`Annuler ${actionLabel} de ${log.entityTypeLabel} #${log.entityId} ?`)) return
+    
+    try {
+      const response = await api.post(`/admin/logs/${log.id}/undo`)
+      showSuccess(response.data.message || 'Action annulée avec succès')
+      
+      // Refresh the appropriate table
+      if (logType === 'user') {
+        loadUserLogs(userLogsPagination.page)
+      } else {
+        loadCalendarLogs(calendarLogsPagination.page)
+      }
+      // Refresh stats as entities may have changed
+      loadStats()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur lors de l\'annulation')
+    }
+  }
+
+  // Check if an action can be undone
+  const canUndo = (log) => {
+    const undoableActions = ['create', 'update', 'delete', 'promote', 'demote', 'permission_change']
+    const undoableEntities = ['user', 'calendar', 'event', 'administrator']
+    return undoableActions.includes(log.action) && undoableEntities.includes(log.entityType)
+  }
+
+  // Open log details modal
+  const openLogDetails = (log) => {
+    setSelectedLog(log)
+    setShowLogDetailsModal(true)
   }
 
   if (loading) {
@@ -593,12 +661,16 @@ function AdminPage() {
             <div className="admin-logs">
               <h2>📋 Journaux d'audit</h2>
               
+              {/* Common Filters */}
               <div className="logs-filters">
                 <select
                   value={logsFilters.action}
                   onChange={(e) => {
                     setLogsFilters({...logsFilters, action: e.target.value})
-                    setTimeout(() => loadLogs(1), 100)
+                    setTimeout(() => {
+                      loadUserLogs(1)
+                      loadCalendarLogs(1)
+                    }, 100)
                   }}
                   className="filter-select"
                 >
@@ -609,27 +681,17 @@ function AdminPage() {
                   <option value="promote">Promotion</option>
                   <option value="demote">Rétrogradation</option>
                   <option value="permission_change">Changement permissions</option>
-                </select>
-                <select
-                  value={logsFilters.entityType}
-                  onChange={(e) => {
-                    setLogsFilters({...logsFilters, entityType: e.target.value})
-                    setTimeout(() => loadLogs(1), 100)
-                  }}
-                  className="filter-select"
-                >
-                  <option value="">Tous les types</option>
-                  <option value="user">Utilisateur</option>
-                  <option value="calendar">Calendrier</option>
-                  <option value="event">Événement</option>
-                  <option value="administrator">Administrateur</option>
+                  <option value="undo">Annulation</option>
                 </select>
                 <input
                   type="date"
                   value={logsFilters.dateFrom}
                   onChange={(e) => {
                     setLogsFilters({...logsFilters, dateFrom: e.target.value})
-                    setTimeout(() => loadLogs(1), 100)
+                    setTimeout(() => {
+                      loadUserLogs(1)
+                      loadCalendarLogs(1)
+                    }, 100)
                   }}
                   className="filter-date"
                   placeholder="Date début"
@@ -639,7 +701,10 @@ function AdminPage() {
                   value={logsFilters.dateTo}
                   onChange={(e) => {
                     setLogsFilters({...logsFilters, dateTo: e.target.value})
-                    setTimeout(() => loadLogs(1), 100)
+                    setTimeout(() => {
+                      loadUserLogs(1)
+                      loadCalendarLogs(1)
+                    }, 100)
                   }}
                   className="filter-date"
                   placeholder="Date fin"
@@ -647,107 +712,222 @@ function AdminPage() {
                 <button 
                   className="btn-action secondary"
                   onClick={() => {
-                    setLogsFilters({ action: '', entityType: '', dateFrom: '', dateTo: '' })
-                    setTimeout(() => loadLogs(1), 100)
+                    setLogsFilters({ action: '', dateFrom: '', dateTo: '' })
+                    setTimeout(() => {
+                      loadUserLogs(1)
+                      loadCalendarLogs(1)
+                    }, 100)
                   }}
                 >
                   🔄 Réinitialiser
                 </button>
               </div>
 
-              <div className="logs-stats">
-                <span>📊 {logsPagination.total} entrées trouvées</span>
-              </div>
+              {/* User Logs Section */}
+              <div className="logs-section">
+                <h3>👤 Logs Utilisateurs & Administrateurs</h3>
+                <div className="logs-stats">
+                  <span>📊 {userLogsPagination.total} entrées</span>
+                </div>
 
-              <div className="logs-table-container">
-                <table className="logs-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Administrateur</th>
-                      <th>Action</th>
-                      <th>Type</th>
-                      <th>ID Entité</th>
-                      <th>Détails</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map(log => (
-                      <tr key={log.id} className={`log-row action-${log.action}`}>
-                        <td className="log-date">
-                          {new Date(log.createdAt).toLocaleString('fr-FR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </td>
-                        <td>
-                          {log.admin?.user ? (
-                            <span className="log-admin">
-                              {log.admin.user.firstName} {log.admin.user.lastName}
-                            </span>
-                          ) : 'Système'}
-                        </td>
-                        <td>
-                          <span className={`action-badge action-${log.action}`}>
-                            {log.actionLabel}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="entity-badge">
-                            {log.entityTypeLabel}
-                          </span>
-                        </td>
-                        <td className="log-entity-id">
-                          {log.entityId || '-'}
-                        </td>
-                        <td>
-                          <button 
-                            className="btn-icon"
-                            title="Voir les détails"
-                            onClick={() => {
-                              const details = []
-                              if (log.oldValue) details.push('Avant: ' + JSON.stringify(log.oldValue, null, 2))
-                              if (log.newValue) details.push('Après: ' + JSON.stringify(log.newValue, null, 2))
-                              if (log.ipAddress) details.push('IP: ' + log.ipAddress)
-                              alert(details.join('\n\n') || 'Aucun détail disponible')
-                            }}
-                          >
-                            🔍
-                          </button>
-                        </td>
+                <div className="logs-table-container">
+                  <table className="logs-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Administrateur</th>
+                        <th>Action</th>
+                        <th>Type</th>
+                        <th>ID</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {logs.length === 0 && (
-                  <div className="no-results">Aucun log trouvé</div>
+                    </thead>
+                    <tbody>
+                      {userLogs.map(log => (
+                        <tr key={log.id} className={`log-row action-${log.action}`}>
+                          <td className="log-date">
+                            {new Date(log.createdAt).toLocaleString('fr-FR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td>
+                            {log.admin?.user ? (
+                              <span className="log-admin">
+                                {log.admin.user.firstName} {log.admin.user.lastName}
+                              </span>
+                            ) : 'Système'}
+                          </td>
+                          <td>
+                            <span className={`action-badge action-${log.action}`}>
+                              {log.actionLabel}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="entity-badge">
+                              {log.entityTypeLabel}
+                            </span>
+                          </td>
+                          <td className="log-entity-id">
+                            {log.entityId || '-'}
+                          </td>
+                          <td>
+                            <div className="log-actions">
+                              <button 
+                                className="btn-icon"
+                                title="Voir les détails"
+                                onClick={() => openLogDetails(log)}
+                              >
+                                🔍
+                              </button>
+                              {canUndo(log) && (
+                                <button 
+                                  className="btn-icon undo"
+                                  title="Annuler cette action"
+                                  onClick={() => handleUndoAction(log, 'user')}
+                                >
+                                  ↩️
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {userLogs.length === 0 && (
+                    <div className="no-results">Aucun log utilisateur trouvé</div>
+                  )}
+                </div>
+
+                {userLogsPagination.totalPages > 1 && (
+                  <div className="logs-pagination">
+                    <button
+                      className="btn-action secondary"
+                      disabled={userLogsPagination.page <= 1}
+                      onClick={() => loadUserLogs(userLogsPagination.page - 1)}
+                    >
+                      ← Précédent
+                    </button>
+                    <span className="pagination-info">
+                      Page {userLogsPagination.page} sur {userLogsPagination.totalPages}
+                    </span>
+                    <button
+                      className="btn-action secondary"
+                      disabled={userLogsPagination.page >= userLogsPagination.totalPages}
+                      onClick={() => loadUserLogs(userLogsPagination.page + 1)}
+                    >
+                      Suivant →
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {logsPagination.totalPages > 1 && (
-                <div className="logs-pagination">
-                  <button
-                    className="btn-action secondary"
-                    disabled={logsPagination.page <= 1}
-                    onClick={() => loadLogs(logsPagination.page - 1)}
-                  >
-                    ← Précédent
-                  </button>
-                  <span className="pagination-info">
-                    Page {logsPagination.page} sur {logsPagination.totalPages}
-                  </span>
-                  <button
-                    className="btn-action secondary"
-                    disabled={logsPagination.page >= logsPagination.totalPages}
-                    onClick={() => loadLogs(logsPagination.page + 1)}
-                  >
-                    Suivant →
-                  </button>
+              {/* Calendar/Event Logs Section */}
+              <div className="logs-section">
+                <h3>📅 Logs Calendriers & Événements</h3>
+                <div className="logs-stats">
+                  <span>📊 {calendarLogsPagination.total} entrées</span>
                 </div>
-              )}
+
+                <div className="logs-table-container">
+                  <table className="logs-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Administrateur</th>
+                        <th>Action</th>
+                        <th>Type</th>
+                        <th>ID</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calendarLogs.map(log => (
+                        <tr key={log.id} className={`log-row action-${log.action}`}>
+                          <td className="log-date">
+                            {new Date(log.createdAt).toLocaleString('fr-FR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td>
+                            {log.admin?.user ? (
+                              <span className="log-admin">
+                                {log.admin.user.firstName} {log.admin.user.lastName}
+                              </span>
+                            ) : 'Système'}
+                          </td>
+                          <td>
+                            <span className={`action-badge action-${log.action}`}>
+                              {log.actionLabel}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="entity-badge">
+                              {log.entityTypeLabel}
+                            </span>
+                          </td>
+                          <td className="log-entity-id">
+                            {log.entityId || '-'}
+                          </td>
+                          <td>
+                            <div className="log-actions">
+                              <button 
+                                className="btn-icon"
+                                title="Voir les détails"
+                                onClick={() => openLogDetails(log)}
+                              >
+                                🔍
+                              </button>
+                              {canUndo(log) && (
+                                <button 
+                                  className="btn-icon undo"
+                                  title="Annuler cette action"
+                                  onClick={() => handleUndoAction(log, 'calendar')}
+                                >
+                                  ↩️
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {calendarLogs.length === 0 && (
+                    <div className="no-results">Aucun log calendrier/événement trouvé</div>
+                  )}
+                </div>
+
+                {calendarLogsPagination.totalPages > 1 && (
+                  <div className="logs-pagination">
+                    <button
+                      className="btn-action secondary"
+                      disabled={calendarLogsPagination.page <= 1}
+                      onClick={() => loadCalendarLogs(calendarLogsPagination.page - 1)}
+                    >
+                      ← Précédent
+                    </button>
+                    <span className="pagination-info">
+                      Page {calendarLogsPagination.page} sur {calendarLogsPagination.totalPages}
+                    </span>
+                    <button
+                      className="btn-action secondary"
+                      disabled={calendarLogsPagination.page >= calendarLogsPagination.totalPages}
+                      onClick={() => loadCalendarLogs(calendarLogsPagination.page + 1)}
+                    >
+                      Suivant →
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </main>
@@ -909,6 +1089,116 @@ function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Log Details Modal */}
+      {showLogDetailsModal && selectedLog && (
+        <div className="modal-overlay" onClick={() => setShowLogDetailsModal(false)}>
+          <div className="modal log-details-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📋 Détails du log</h2>
+              <button className="modal-close" onClick={() => setShowLogDetailsModal(false)}>×</button>
+            </div>
+            <div className="log-details-content">
+              {/* Log Info */}
+              <div className="log-details-section">
+                <h3>Informations générales</h3>
+                <div className="log-details-grid">
+                  <div className="log-detail-item">
+                    <span className="log-detail-label">Date</span>
+                    <span className="log-detail-value">
+                      {new Date(selectedLog.createdAt).toLocaleString('fr-FR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  <div className="log-detail-item">
+                    <span className="log-detail-label">Administrateur</span>
+                    <span className="log-detail-value">
+                      {selectedLog.admin?.user 
+                        ? `${selectedLog.admin.user.firstName} ${selectedLog.admin.user.lastName}`
+                        : 'Système'}
+                    </span>
+                  </div>
+                  <div className="log-detail-item">
+                    <span className="log-detail-label">Action</span>
+                    <span className={`action-badge action-${selectedLog.action}`}>
+                      {selectedLog.actionLabel}
+                    </span>
+                  </div>
+                  <div className="log-detail-item">
+                    <span className="log-detail-label">Type d'entité</span>
+                    <span className="entity-badge">{selectedLog.entityTypeLabel}</span>
+                  </div>
+                  <div className="log-detail-item">
+                    <span className="log-detail-label">ID Entité</span>
+                    <span className="log-detail-value">{selectedLog.entityId || '-'}</span>
+                  </div>
+                  {selectedLog.ipAddress && (
+                    <div className="log-detail-item">
+                      <span className="log-detail-label">Adresse IP</span>
+                      <span className="log-detail-value">{selectedLog.ipAddress}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Old Value */}
+              {selectedLog.oldValue && (
+                <div className="log-details-section">
+                  <h3>🔴 Valeurs avant modification</h3>
+                  <div className="log-json-container">
+                    <pre className="log-json old-value">
+                      {JSON.stringify(selectedLog.oldValue, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* New Value */}
+              {selectedLog.newValue && (
+                <div className="log-details-section">
+                  <h3>🟢 Valeurs après modification</h3>
+                  <div className="log-json-container">
+                    <pre className="log-json new-value">
+                      {JSON.stringify(selectedLog.newValue, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* No details available */}
+              {!selectedLog.oldValue && !selectedLog.newValue && (
+                <div className="log-details-section">
+                  <p className="no-details">Aucun détail supplémentaire disponible pour cette action.</p>
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              {canUndo(selectedLog) && (
+                <button 
+                  type="button" 
+                  className="btn-undo-action"
+                  onClick={() => {
+                    const logType = ['user', 'administrator'].includes(selectedLog.entityType) ? 'user' : 'calendar'
+                    handleUndoAction(selectedLog, logType)
+                    setShowLogDetailsModal(false)
+                  }}
+                >
+                  ↩️ Annuler cette action
+                </button>
+              )}
+              <button type="button" className="btn-cancel" onClick={() => setShowLogDetailsModal(false)}>
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       )}

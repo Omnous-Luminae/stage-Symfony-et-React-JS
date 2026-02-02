@@ -2006,3 +2006,427 @@ body.dark-mode .loading-spinner {
   border-color: #334155;
   border-top-color: #818cf8;
 }
+/* ==========================================
+   MODAL PARTAGE AMÉLIORÉ
+   ========================================== */
+.share-modal {
+  max-width: 580px;
+}
+
+.share-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+}
+
+.share-modal .modal-header h2 {
+  font-size: 1.2em;
+  margin: 0;
+}
+
+.share-modal .modal-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.5em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.share-modal .modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+}
+
+.share-section {
+  margin-bottom: 24px;
+}
+
+.share-section h4 {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Section ajouter personne */
+.share-add-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 20px;
+  border-radius: 16px;
+  border: 2px dashed #e2e8f0;
+}
+
+.share-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.share-input-row {
+  display: flex;
+  gap: 12px;
+}
+
+.share-input-field {
+  flex: 1;
+}
+
+.share-input-field label {
+  display: block;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.share-input-field input,
+.share-input-field select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.95em;
+  color: #1e293b;
+  background: white;
+  transition: all 0.2s;
+}
+
+.share-input-field input:focus,
+.share-input-field select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.share-input-field input::placeholder {
+  color: #94a3b8;
+}
+
+.share-permission-field {
+  flex: 0 0 180px;
+}
+
+.btn-share-add {
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-share-add:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+}
+
+.btn-share-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-share-add span {
+  font-size: 1.1em;
+}
+
+/* Section utilisateurs partagés */
+.share-users-section {
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.share-empty {
+  text-align: center;
+  padding: 32px 20px;
+  color: #64748b;
+}
+
+.share-empty-icon {
+  font-size: 2.5em;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.share-empty p {
+  margin: 0 0 8px 0;
+  font-size: 0.95em;
+  font-weight: 500;
+  color: #475569;
+}
+
+.share-empty-hint {
+  font-size: 0.85em;
+  color: #94a3b8;
+}
+
+.shared-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.shared-users-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shared-users-list::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 3px;
+}
+
+.shared-user-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.shared-user-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateX(4px);
+}
+
+.shared-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9em;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
+}
+
+.shared-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.shared-user-name {
+  font-weight: 600;
+  font-size: 0.95em;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.shared-user-email {
+  font-size: 0.8em;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.shared-user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7em;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.shared-user-badge.permission-consultation {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  color: #0369a1;
+}
+
+.shared-user-badge.permission-modification {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #b45309;
+}
+
+.shared-user-badge.permission-administration {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  color: #7c3aed;
+}
+
+.btn-remove-share {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fff1f2, #fee2e2);
+  border: 1px solid #fecaca;
+  color: #ef4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-remove-share:hover {
+  background: linear-gradient(145deg, #fee2e2, #fecaca);
+  border-color: #f87171;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-remove-share span {
+  font-size: 1.1em;
+}
+
+/* Modal footer */
+.share-modal .modal-footer {
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-close-share {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-close-share:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(71, 85, 105, 0.3);
+}
+
+/* Dark mode pour modal partage */
+body.dark-mode .share-modal .modal-close {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .share-add-section {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-color: #334155;
+}
+
+body.dark-mode .share-section h4 {
+  color: #94a3b8;
+}
+
+body.dark-mode .share-input-field label {
+  color: #94a3b8;
+}
+
+body.dark-mode .share-input-field input,
+body.dark-mode .share-input-field select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .share-input-field input:focus,
+body.dark-mode .share-input-field select:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+
+body.dark-mode .share-users-section {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .share-empty p {
+  color: #94a3b8;
+}
+
+body.dark-mode .share-empty-hint {
+  color: #64748b;
+}
+
+body.dark-mode .shared-user-card {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-color: #334155;
+}
+
+body.dark-mode .shared-user-card:hover {
+  border-color: #475569;
+}
+
+body.dark-mode .shared-user-name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .shared-user-email {
+  color: #64748b;
+}
+
+body.dark-mode .shared-user-badge.permission-consultation {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(14, 165, 233, 0.1) 100%);
+  color: #38bdf8;
+}
+
+body.dark-mode .shared-user-badge.permission-modification {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+  color: #fbbf24;
+}
+
+body.dark-mode .shared-user-badge.permission-administration {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%);
+  color: #a78bfa;
+}
+
+body.dark-mode .btn-remove-share {
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08));
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+body.dark-mode .btn-remove-share:hover {
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.15));
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+body.dark-mode .share-modal .modal-footer {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .btn-close-share {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+}

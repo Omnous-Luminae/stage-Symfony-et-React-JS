@@ -21,6 +21,7 @@ class AuditLog
     public const ACTION_PROMOTE = 'promote';
     public const ACTION_DEMOTE = 'demote';
     public const ACTION_PERMISSION_CHANGE = 'permission_change';
+    public const ACTION_UNDO = 'undo';
 
     // Entity types
     public const ENTITY_USER = 'user';
@@ -206,6 +207,7 @@ class AuditLog
             self::ACTION_PROMOTE => 'Promotion admin',
             self::ACTION_DEMOTE => 'Rétrogradation',
             self::ACTION_PERMISSION_CHANGE => 'Changement de permissions',
+            self::ACTION_UNDO => 'Annulation',
             default => $this->action
         };
     }

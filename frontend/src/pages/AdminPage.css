@@ -1295,6 +1295,27 @@ body.dark-mode .permissions-checkboxes {
   font-size: 0.9rem;
 }
 
+/* Logs sections styling */
+.logs-section {
+  margin-bottom: 2.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 20px;
+}
+
+.logs-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logs-section .logs-stats {
+  margin-bottom: 0.75rem;
+}
+
 .logs-table-container {
   background: white;
   border-radius: 16px;
@@ -1390,6 +1411,11 @@ body.dark-mode .permissions-checkboxes {
   color: #0d9488;
 }
 
+.action-badge.action-undo {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(107, 114, 128, 0.05));
+  color: #6b7280;
+}
+
 .entity-badge {
   display: inline-flex;
   align-items: center;
@@ -1399,6 +1425,25 @@ body.dark-mode .permissions-checkboxes {
   font-weight: 500;
   background: #f1f5f9;
   color: #475569;
+}
+
+/* Log actions buttons */
+.log-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btn-icon.undo {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: white;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-icon.undo:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
 }
 
 /* Log row highlighting based on action */
@@ -1452,6 +1497,14 @@ body.dark-mode .filter-date:focus {
 
 body.dark-mode .logs-stats {
   color: #94a3b8;
+}
+
+body.dark-mode .logs-section {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+}
+
+body.dark-mode .logs-section h3 {
+  color: #e2e8f0;
 }
 
 body.dark-mode .logs-table-container {
@@ -1521,6 +1574,15 @@ body.dark-mode .action-badge.action-permission_change {
   color: #2dd4bf;
 }
 
+body.dark-mode .action-badge.action-undo {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.2), rgba(107, 114, 128, 0.1));
+  color: #9ca3af;
+}
+
+body.dark-mode .btn-icon.undo {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+
 body.dark-mode .log-row.action-delete {
   background: rgba(239, 68, 68, 0.05);
 }
@@ -1531,4 +1593,172 @@ body.dark-mode .log-row.action-delete:hover {
 
 body.dark-mode .pagination-info {
   color: #94a3b8;
+}
+
+/* ============================================
+   LOG DETAILS MODAL
+   ============================================ */
+
+.log-details-modal {
+  max-width: 700px;
+  width: 95%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.log-details-content {
+  padding: 1.5rem;
+}
+
+.log-details-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.log-details-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.log-details-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.log-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.log-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.log-detail-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.log-detail-value {
+  font-size: 0.95rem;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.log-json-container {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1rem;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+}
+
+.log-json {
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-json.old-value {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.05);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #dc2626;
+}
+
+.log-json.new-value {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.05);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #16a34a;
+}
+
+.no-details {
+  text-align: center;
+  color: #64748b;
+  font-style: italic;
+  padding: 2rem;
+}
+
+.btn-undo-action {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-undo-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+/* Dark mode for log details modal */
+body.dark-mode .log-details-section {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .log-details-section h3 {
+  color: #e2e8f0;
+}
+
+body.dark-mode .log-detail-label {
+  color: #94a3b8;
+}
+
+body.dark-mode .log-detail-value {
+  color: #f1f5f9;
+}
+
+body.dark-mode .log-json-container {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .log-json.old-value {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+body.dark-mode .log-json.new-value {
+  color: #86efac;
+  background: rgba(22, 163, 74, 0.1);
+}
+
+body.dark-mode .no-details {
+  color: #94a3b8;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .log-details-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .log-details-modal {
+    max-height: 90vh;
+  }
 }

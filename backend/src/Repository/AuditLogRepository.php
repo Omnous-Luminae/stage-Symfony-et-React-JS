@@ -39,8 +39,15 @@ class AuditLogRepository extends ServiceEntityRepository
         }
 
         if ($entityType) {
-            $qb->andWhere('l.entityType = :entityType')
-               ->setParameter('entityType', $entityType);
+            // Support multiple entity types separated by comma
+            $types = array_map('trim', explode(',', $entityType));
+            if (count($types) > 1) {
+                $qb->andWhere('l.entityType IN (:entityTypes)')
+                   ->setParameter('entityTypes', $types);
+            } else {
+                $qb->andWhere('l.entityType = :entityType')
+                   ->setParameter('entityType', $entityType);
+            }
         }
 
         if ($adminId) {
@@ -86,8 +93,15 @@ class AuditLogRepository extends ServiceEntityRepository
         }
 
         if ($entityType) {
-            $qb->andWhere('l.entityType = :entityType')
-               ->setParameter('entityType', $entityType);
+            // Support multiple entity types separated by comma
+            $types = array_map('trim', explode(',', $entityType));
+            if (count($types) > 1) {
+                $qb->andWhere('l.entityType IN (:entityTypes)')
+                   ->setParameter('entityTypes', $types);
+            } else {
+                $qb->andWhere('l.entityType = :entityType')
+                   ->setParameter('entityType', $entityType);
+            }
         }
 
         if ($adminId) {

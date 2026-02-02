@@ -5,8 +5,10 @@ namespace App\Controller\Api;
 use App\Entity\Event;
 use App\Entity\Calendar;
 use App\Entity\User;
+use App\Repository\AdministratorRepository;
 use App\Repository\CalendarPermissionRepository;
 use App\Repository\EventRepository;
+use App\Service\AuditLogService;
 use App\Service\SessionUserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,6 +20,38 @@ use Symfony\Component\Serializer\SerializerInterface;
 #[Route('/api', name: 'api_')]
 class EventController extends AbstractController
 {
+    private AuditLogService $auditLogService;
+    private AdministratorRepository $adminRepository;
+    private SessionUserService $sessionUserService;
+
+    public function __construct(
+        AuditLogService $auditLogService,
+        AdministratorRepository $adminRepository,
+        SessionUserService $sessionUserService
+    ) {
+        $this->auditLogService = $auditLogService;
+        $this->adminRepository = $adminRepository;
+        $this->sessionUserService = $sessionUserService;
+    }
+
+    /**
+     * Try to log action if current user is admin
+     */
+    private function tryLogAction(string $method, ...$args): void
+    {
+        try {
+            $user = $this->sessionUserService->getCurrentUser();
+            if ($user) {
+                $admin = $this->adminRepository->findByUser($user);
+                if ($admin) {
+                    $this->auditLogService->$method(...$args);
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently fail - logging should not break the main operation
+        }
+    }
+
     // Constantes pour les couleurs
     private const COLOR_BLUE = '#3788d8';
     private const COLOR_GREEN = '#4caf50';
@@ -219,6 +253,17 @@ class EventController extends AbstractController
                 $this->generateRecurringEvents($event, $entityManager);
             }
 
+            // Log the action if user is admin
+            $this->tryLogAction('logEventCreated', $event->getId(), [
+                'title' => $event->getTitle(),
+                'start' => $event->getStartDate()->format('Y-m-d H:i'),
+                'end' => $event->getEndDate()->format('Y-m-d H:i'),
+                'type' => $event->getType(),
+                'calendarId' => $event->getCalendar()?->getId(),
+                'calendarName' => $event->getCalendar()?->getName(),
+                'isRecurrent' => $event->isIsRecurrent()
+            ]);
+
             // Retourner l'événement au format FullCalendar
             return $this->json($this->eventToArray($event), 201);
         } catch (\Exception $e) {
@@ -340,6 +385,17 @@ class EventController extends AbstractController
             return $this->json(['error' => 'Event not found'], 404);
         }
 
+        // Sauvegarder les données pour le log
+        $eventData = [
+            'title' => $event->getTitle(),
+            'start' => $event->getStartDate()->format('Y-m-d H:i'),
+            'end' => $event->getEndDate()->format('Y-m-d H:i'),
+            'type' => $event->getType(),
+            'calendarId' => $event->getCalendar()?->getId(),
+            'calendarName' => $event->getCalendar()?->getName()
+        ];
+        $eventId = $event->getId();
+
         // Vérifier si on doit supprimer toute la série
         $deleteSeries = $request->query->get('deleteSeries') === 'true';
         
@@ -362,6 +418,10 @@ class EventController extends AbstractController
                 // Supprimer le parent lui-même
                 $entityManager->remove($parentEvent);
                 $entityManager->flush();
+                
+                // Log deletion of series
+                $this->tryLogAction('logEventDeleted', $eventId, array_merge($eventData, ['deletedSeries' => true]));
+                
                 return $this->json(['message' => 'Event series deleted successfully'], 200);
             }
         } else {
@@ -389,6 +449,11 @@ class EventController extends AbstractController
                 $entityManager->remove($event);
                 $entityManager->flush();
                 
+                // Log deletion with promotion info
+                $this->tryLogAction('logEventDeleted', $eventId, array_merge($eventData, [
+                    'promotedChildId' => $newParent->getId()
+                ]));
+                
                 return $this->json([
                     'message' => 'Event deleted, series continues with remaining occurrences',
                     'newParentId' => $newParent->getId()
@@ -399,6 +464,9 @@ class EventController extends AbstractController
         // Supprimer l'événement (simple ou parent sans enfants)
         $entityManager->remove($event);
         $entityManager->flush();
+
+        // Log the deletion
+        $this->tryLogAction('logEventDeleted', $eventId, $eventData);
 
         return $this->json(['message' => 'Event deleted successfully'], 200);
     }
@@ -412,6 +480,16 @@ class EventController extends AbstractController
             if (!$event) {
                 return $this->json(['error' => 'Event not found'], 404);
             }
+
+            // Sauvegarder les anciennes données pour le log
+            $oldData = [
+                'title' => $event->getTitle(),
+                'start' => $event->getStartDate()->format('Y-m-d H:i'),
+                'end' => $event->getEndDate()->format('Y-m-d H:i'),
+                'type' => $event->getType(),
+                'location' => $event->getLocation(),
+                'description' => $event->getDescription()
+            ];
 
             $data = json_decode($request->getContent(), true);
 
@@ -458,6 +536,17 @@ class EventController extends AbstractController
             // Persister les modifications
             $entityManager->persist($event);
             $entityManager->flush();
+
+            // Log the update if user is admin
+            $newData = [
+                'title' => $event->getTitle(),
+                'start' => $event->getStartDate()->format('Y-m-d H:i'),
+                'end' => $event->getEndDate()->format('Y-m-d H:i'),
+                'type' => $event->getType(),
+                'location' => $event->getLocation(),
+                'description' => $event->getDescription()
+            ];
+            $this->tryLogAction('logEventUpdated', $event->getId(), $oldData, $newData);
 
             // Retourner l'événement mis à jour
             return $this->json($this->eventToArray($event), 200);

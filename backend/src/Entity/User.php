@@ -18,19 +18,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'id_user', type: Types::INTEGER)]
-    #[Groups(['user:read', 'calendar:read', 'event:read'])]
+    #[Groups(['user:read', 'calendar:read', 'event:read', 'permission:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:write', 'calendar:read', 'event:read'])]
+    #[Groups(['user:read', 'user:write', 'calendar:read', 'event:read', 'permission:read'])]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:write', 'calendar:read', 'event:read'])]
+    #[Groups(['user:read', 'user:write', 'calendar:read', 'event:read', 'permission:read'])]
     private ?string $lastName = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'permission:read'])]
     private ?string $email = null;
 
     #[ORM\Column(type: 'string', length: 50)]
