@@ -54,10 +54,15 @@ class CalendarPermission
     #[Groups(['permission:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
+    #[ORM\Column(type: 'datetime_immutable', name: 'granted_at')]
+    #[Groups(['permission:read'])]
+    private ?\DateTimeImmutable $grantedAt = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+        $this->grantedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -143,6 +148,18 @@ class CalendarPermission
     public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getGrantedAt(): ?\DateTimeImmutable
+    {
+        return $this->grantedAt;
+    }
+
+    public function setGrantedAt(\DateTimeImmutable $grantedAt): static
+    {
+        $this->grantedAt = $grantedAt;
 
         return $this;
     }
