@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { calendarService } from '../api/events'
 import { useNotification } from '../context/NotificationContext'
 import './AdminPage.css'
 
@@ -62,6 +63,10 @@ function AdminPage() {
   // Log details modal state
   const [showLogDetailsModal, setShowLogDetailsModal] = useState(false)
   const [selectedLog, setSelectedLog] = useState(null)
+  
+  // General calendar state
+  const [generalCalendar, setGeneralCalendar] = useState(null)
+  const [creatingGeneralCalendar, setCreatingGeneralCalendar] = useState(false)
 
   // Check admin status
   useEffect(() => {
@@ -113,6 +118,34 @@ function AdminPage() {
     }
   }, [])
 
+  // Load general calendar status
+  const loadGeneralCalendar = useCallback(async () => {
+    try {
+      const response = await calendarService.getGeneralCalendar()
+      setGeneralCalendar(response.data.calendar)
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setGeneralCalendar(null)
+      } else {
+        console.error('Error loading general calendar:', error)
+      }
+    }
+  }, [])
+
+  // Create general calendar
+  const handleCreateGeneralCalendar = async () => {
+    setCreatingGeneralCalendar(true)
+    try {
+      const response = await calendarService.initGeneralCalendar()
+      setGeneralCalendar(response.data.calendar)
+      showSuccess('Calendrier général créé avec succès !')
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur lors de la création du calendrier général')
+    } finally {
+      setCreatingGeneralCalendar(false)
+    }
+  }
+
   // Load user logs (user + administrator entities)
   const loadUserLogs = useCallback(async (page = 1) => {
     try {
@@ -152,12 +185,13 @@ function AdminPage() {
       loadStats()
       loadUsers()
       loadAdmins()
+      loadGeneralCalendar()
       if (adminPermissions.canViewAuditLogs) {
         loadUserLogs()
         loadCalendarLogs()
       }
     }
-  }, [isAdmin, loadStats, loadUsers, loadAdmins, loadUserLogs, loadCalendarLogs, adminPermissions.canViewAuditLogs])
+  }, [isAdmin, loadStats, loadUsers, loadAdmins, loadGeneralCalendar, loadUserLogs, loadCalendarLogs, adminPermissions.canViewAuditLogs])
 
   // Filtered users
   const filteredUsers = users.filter(user => {
@@ -463,6 +497,44 @@ function AdminPage() {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              {/* Section Calendrier Général */}
+              <div className="general-calendar-section">
+                <h3>📢 Calendrier Général</h3>
+                <p className="section-description">
+                  Le calendrier général est visible par tous les utilisateurs. 
+                  Seuls les administrateurs peuvent y créer des événements.
+                </p>
+                
+                {generalCalendar ? (
+                  <div className="general-calendar-info">
+                    <div className="calendar-badge" style={{ borderLeftColor: generalCalendar.color }}>
+                      <span className="calendar-icon">📅</span>
+                      <div className="calendar-details">
+                        <span className="calendar-name">{generalCalendar.name}</span>
+                        <span className="calendar-desc">{generalCalendar.description}</span>
+                      </div>
+                      <span className="calendar-status active">✅ Actif</span>
+                    </div>
+                    <p className="calendar-hint">
+                      💡 Pour ajouter des événements, allez sur le calendrier et sélectionnez "📢 Calendrier Général" dans la liste.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="general-calendar-create">
+                    <p className="no-calendar-message">
+                      ⚠️ Le calendrier général n'a pas encore été créé.
+                    </p>
+                    <button 
+                      className="btn-action primary"
+                      onClick={handleCreateGeneralCalendar}
+                      disabled={creatingGeneralCalendar}
+                    >
+                      {creatingGeneralCalendar ? '⏳ Création...' : '➕ Créer le calendrier général'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

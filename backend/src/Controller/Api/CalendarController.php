@@ -70,6 +70,13 @@ class CalendarController extends AbstractController
             }
         }
 
+        // Get public calendars (calendrier général)
+        $publicCalendars = $calendarRepository->findBy(['type' => Calendar::TYPE_PUBLIC]);
+        error_log('📅 Public calendars: ' . count($publicCalendars));
+
+        // Check if user is admin
+        $isAdmin = $this->adminRepository->findByUser($user) !== null;
+
         // Build response with ownership info
         $result = [];
         
@@ -100,6 +107,31 @@ class CalendarController extends AbstractController
                 'ownerName' => $shared['ownerName'],
                 'owner_id' => $calendar->getOwner()->getId()
             ];
+        }
+
+        // Add public calendars (calendrier général)
+        foreach ($publicCalendars as $calendar) {
+            // Éviter les doublons si le calendrier public est aussi possédé par l'utilisateur
+            $alreadyAdded = false;
+            foreach ($result as $r) {
+                if ($r['id'] === $calendar->getId()) {
+                    $alreadyAdded = true;
+                    break;
+                }
+            }
+            if (!$alreadyAdded) {
+                $result[] = [
+                    'id' => $calendar->getId(),
+                    'name' => $calendar->getName(),
+                    'description' => $calendar->getDescription(),
+                    'color' => $calendar->getColor(),
+                    'type' => 'public',
+                    'isOwner' => false,
+                    'isPublic' => true,
+                    'canEdit' => $isAdmin, // Seuls les admins peuvent modifier
+                    'owner_id' => $calendar->getOwner()?->getId()
+                ];
+            }
         }
 
         error_log('📅 Total calendars returned: ' . count($result));
@@ -345,5 +377,91 @@ class CalendarController extends AbstractController
         } catch (\Exception $e) {
             return $this->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    #[Route('/general/init', name: 'init_general', methods: ['POST'])]
+    public function initGeneralCalendar(
+        CalendarRepository $calendarRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        // Vérifier que l'utilisateur est admin
+        $user = $this->sessionUserService->getCurrentUser();
+        if (!$user || !$this->adminRepository->findByUser($user)) {
+            return $this->json(['error' => 'Admin access required'], 403);
+        }
+
+        // Vérifier si un calendrier général existe déjà
+        $existingPublic = $calendarRepository->findOneBy(['type' => Calendar::TYPE_PUBLIC]);
+        if ($existingPublic) {
+            return $this->json([
+                'message' => 'Le calendrier général existe déjà',
+                'calendar' => [
+                    'id' => $existingPublic->getId(),
+                    'name' => $existingPublic->getName(),
+                    'description' => $existingPublic->getDescription(),
+                    'color' => $existingPublic->getColor(),
+                    'type' => 'public'
+                ]
+            ]);
+        }
+
+        // Créer le calendrier général
+        $calendar = new Calendar();
+        $calendar->setName('📢 Calendrier Général');
+        $calendar->setDescription('Calendrier commun visible par tous les utilisateurs. Seuls les administrateurs peuvent y ajouter des événements.');
+        $calendar->setColor('#ef4444'); // Rouge pour le distinguer
+        $calendar->setType(Calendar::TYPE_PUBLIC);
+        $calendar->setOwner(null); // Pas de propriétaire spécifique
+
+        $entityManager->persist($calendar);
+        $entityManager->flush();
+
+        // Log l'action
+        $this->tryLogAction('logCalendarCreated', $calendar->getId(), [
+            'name' => $calendar->getName(),
+            'description' => $calendar->getDescription(),
+            'color' => $calendar->getColor(),
+            'type' => 'public'
+        ]);
+
+        return $this->json([
+            'message' => 'Calendrier général créé avec succès',
+            'calendar' => [
+                'id' => $calendar->getId(),
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+                'type' => 'public'
+            ]
+        ], 201);
+    }
+
+    #[Route('/general', name: 'get_general', methods: ['GET'])]
+    public function getGeneralCalendar(CalendarRepository $calendarRepository): JsonResponse
+    {
+        $user = $this->sessionUserService->getCurrentUser();
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], 401);
+        }
+
+        $calendar = $calendarRepository->findOneBy(['type' => Calendar::TYPE_PUBLIC]);
+        
+        if (!$calendar) {
+            return $this->json(['error' => 'Calendrier général non trouvé', 'exists' => false], 404);
+        }
+
+        $isAdmin = $this->adminRepository->findByUser($user) !== null;
+
+        return $this->json([
+            'exists' => true,
+            'calendar' => [
+                'id' => $calendar->getId(),
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+                'type' => 'public',
+                'canEdit' => $isAdmin
+            ]
+        ]);
     }
 }

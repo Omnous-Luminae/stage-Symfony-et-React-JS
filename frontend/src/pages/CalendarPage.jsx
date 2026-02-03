@@ -680,6 +680,31 @@ function CalendarPage() {
                     ))
                   )}
                 </div>
+
+                {/* Calendriers publics (général) */}
+                {calendars.filter(c => c.type === 'public' || c.isPublic).length > 0 && (
+                  <div className="calendar-section">
+                    <h4>📢 Calendrier Général</h4>
+                    {calendars.filter(c => c.type === 'public' || c.isPublic).map(calendar => (
+                      <div
+                        key={calendar.id}
+                        className={`calendar-item public ${activeCalendar?.id === calendar.id ? 'active' : ''}`}
+                        onClick={() => setActiveCalendar(calendar)}
+                      >
+                        <div className="calendar-color-dot" style={{ background: calendar.color }} />
+                        <div className="calendar-item-info">
+                          <div className="calendar-item-name">{calendar.name}</div>
+                          <div className="calendar-item-meta">
+                            {calendar.canEdit ? '✏️ Modifiable' : '👁️ Lecture seule'}
+                          </div>
+                        </div>
+                        {calendar.canEdit && (
+                          <span className="admin-badge" title="Vous pouvez modifier ce calendrier">⚙️</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -695,24 +720,39 @@ function CalendarPage() {
                   <div>
                     <h2>{activeCalendar.name}</h2>
                     {activeCalendar.description && <span>{activeCalendar.description}</span>}
+                    {activeCalendar.type === 'public' && (
+                      <span className="public-calendar-badge">📢 Calendrier Général</span>
+                    )}
                   </div>
                 </div>
                 <div className="calendar-actions">
-                  <button className="btn-action secondary" onClick={openEditCalendarModal}>
-                    ✏️ Modifier
-                  </button>
-                  <button className="btn-action secondary" onClick={() => openShareModal(activeCalendar)}>
-                    📤 Partager
-                  </button>
-                  <button className="btn-action primary" onClick={() => {
-                    const now = new Date()
-                    const start = now.toISOString().slice(0, 16)
-                    const end = new Date(now.getTime() + 3600000).toISOString().slice(0, 16)
-                    setFormData({ ...defaultFormData, startDate: start, endDate: end })
-                    setShowEventModal(true)
-                  }}>
-                    ➕ Nouvel événement
-                  </button>
+                  {/* Boutons de modification - cachés pour les calendriers publics si pas admin */}
+                  {activeCalendar.isOwner && (
+                    <>
+                      <button className="btn-action secondary" onClick={openEditCalendarModal}>
+                        ✏️ Modifier
+                      </button>
+                      <button className="btn-action secondary" onClick={() => openShareModal(activeCalendar)}>
+                        📤 Partager
+                      </button>
+                    </>
+                  )}
+                  {/* Bouton créer événement - visible si propriétaire, ou si calendrier public avec canEdit */}
+                  {(activeCalendar.isOwner || activeCalendar.permission === 'Modification' || activeCalendar.permission === 'Administration' || activeCalendar.canEdit) && (
+                    <button className="btn-action primary" onClick={() => {
+                      const now = new Date()
+                      const start = now.toISOString().slice(0, 16)
+                      const end = new Date(now.getTime() + 3600000).toISOString().slice(0, 16)
+                      setFormData({ ...defaultFormData, startDate: start, endDate: end })
+                      setShowEventModal(true)
+                    }}>
+                      ➕ Nouvel événement
+                    </button>
+                  )}
+                  {/* Message si pas de droits de modification */}
+                  {!activeCalendar.isOwner && !activeCalendar.canEdit && activeCalendar.permission !== 'Modification' && activeCalendar.permission !== 'Administration' && (
+                    <span className="readonly-badge">👁️ Lecture seule</span>
+                  )}
                 </div>
               </div>
 

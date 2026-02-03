@@ -288,6 +288,50 @@
   border: 1px solid #e0e5f5;
 }
 
+.calendar-item.public {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff 100%);
+  border: 1px solid #fecaca;
+}
+
+.calendar-item.public:hover {
+  border-color: #f87171;
+}
+
+.calendar-item.public.active {
+  background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+  border-color: #ef4444;
+}
+
+.admin-badge {
+  font-size: 1.1em;
+  padding: 4px 8px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 8px;
+}
+
+.public-calendar-badge {
+  display: inline-block;
+  font-size: 0.75em;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #b91c1c;
+  border-radius: 20px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #64748b;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.9em;
+}
+
 /* ==========================================
    ZONE PRINCIPALE DU CALENDRIER
    ========================================== */

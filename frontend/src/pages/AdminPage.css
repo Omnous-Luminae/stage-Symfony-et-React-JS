@@ -306,6 +306,111 @@
   border-radius: 20px;
 }
 
+/* Section Calendrier Général */
+.general-calendar-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 16px;
+  border: 2px solid #f59e0b;
+}
+
+.general-calendar-section h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-description {
+  color: #78350f;
+  font-size: 0.9rem;
+  margin: 0 0 1.25rem 0;
+  line-height: 1.5;
+}
+
+.general-calendar-info {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.calendar-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border-left: 4px solid #ef4444;
+}
+
+.calendar-icon {
+  font-size: 2rem;
+}
+
+.calendar-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #1e293b;
+}
+
+.calendar-desc {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.calendar-status {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.calendar-status.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.calendar-hint {
+  margin: 1rem 0 0 0;
+  padding: 0.75rem 1rem;
+  background: #f0f9ff;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #0369a1;
+  border-left: 3px solid #0ea5e9;
+}
+
+.general-calendar-create {
+  text-align: center;
+  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+}
+
+.no-calendar-message {
+  color: #78350f;
+  font-weight: 500;
+  margin: 0 0 1rem 0;
+}
+
+.general-calendar-create .btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Users Section */
 .users-header {
   display: flex;

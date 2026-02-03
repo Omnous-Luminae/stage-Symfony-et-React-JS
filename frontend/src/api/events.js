@@ -44,5 +44,9 @@ export const calendarService = {
 
   // Supprimer un partage par email
   removeShare: (calendarId, email) => api.delete(`/calendars/${calendarId}/share`, { data: { email } }),
+
+  // Calendrier général
+  getGeneralCalendar: () => api.get('/calendars/general'),
+  initGeneralCalendar: () => api.post('/calendars/general/init'),
 };
 

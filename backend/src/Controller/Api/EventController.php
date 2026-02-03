@@ -209,6 +209,15 @@ class EventController extends AbstractController
                 $calendar = $entityManager->getRepository(Calendar::class)->find($data['calendarId']);
                 error_log('📌 Calendar trouvé: ' . ($calendar ? 'OUI' : 'NON'));
                 if ($calendar) {
+                    // Vérifier les permissions pour le calendrier public
+                    if ($calendar->getType() === Calendar::TYPE_PUBLIC) {
+                        $currentUser = $this->sessionUserService->getCurrentUser();
+                        $isAdmin = $currentUser && $this->adminRepository->findByUser($currentUser);
+                        if (!$isAdmin) {
+                            return $this->json(['error' => 'Seuls les administrateurs peuvent créer des événements sur le calendrier général'], 403);
+                        }
+                    }
+                    
                     $event->setCalendar($calendar);
                     error_log('📌 Calendar associé: ' . $calendar->getName());
                     // Utiliser la couleur du calendrier si disponible
@@ -385,6 +394,16 @@ class EventController extends AbstractController
             return $this->json(['error' => 'Event not found'], 404);
         }
 
+        // Vérifier les permissions pour les calendriers publics
+        $calendar = $event->getCalendar();
+        if ($calendar && $calendar->getType() === Calendar::TYPE_PUBLIC) {
+            $currentUser = $this->sessionUserService->getCurrentUser();
+            $isAdmin = $currentUser && $this->adminRepository->findByUser($currentUser);
+            if (!$isAdmin) {
+                return $this->json(['error' => 'Seuls les administrateurs peuvent supprimer les événements du calendrier général'], 403);
+            }
+        }
+
         // Sauvegarder les données pour le log
         $eventData = [
             'title' => $event->getTitle(),
@@ -479,6 +498,16 @@ class EventController extends AbstractController
             
             if (!$event) {
                 return $this->json(['error' => 'Event not found'], 404);
+            }
+
+            // Vérifier les permissions pour les calendriers publics
+            $calendar = $event->getCalendar();
+            if ($calendar && $calendar->getType() === Calendar::TYPE_PUBLIC) {
+                $currentUser = $this->sessionUserService->getCurrentUser();
+                $isAdmin = $currentUser && $this->adminRepository->findByUser($currentUser);
+                if (!$isAdmin) {
+                    return $this->json(['error' => 'Seuls les administrateurs peuvent modifier les événements du calendrier général'], 403);
+                }
             }
 
             // Sauvegarder les anciennes données pour le log
