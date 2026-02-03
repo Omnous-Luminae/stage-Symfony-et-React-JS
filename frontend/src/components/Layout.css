@@ -57,60 +57,127 @@
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   position: relative;
   z-index: 1;
 }
 
-.user-menu {
-  position: relative;
-  cursor: pointer;
-}
-
-.user-name {
-  font-weight: 600;
-  padding: 10px 18px;
-  border-radius: 12px;
-  transition: all 0.3s;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+.header-user-section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
-.user-name:hover {
-  background: rgba(255, 255, 255, 0.2);
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: white;
+  font-weight: 500;
+}
+
+.user-menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8em;
+  text-transform: uppercase;
+}
+
+.user-name-text {
+  font-size: 0.9em;
+}
+
+.dropdown-arrow {
+  font-size: 0.6em;
+  transition: transform 0.3s;
+  opacity: 0.7;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
 }
 
 .user-dropdown {
   display: none;
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   right: 0;
   background: white;
   border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+  min-width: 240px;
   z-index: 1000;
   overflow: hidden;
-  animation: dropdownFade 0.2s ease-out;
+  animation: dropdownFade 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.user-dropdown.show {
+  display: block;
+}
+
+.dropdown-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dropdown-user-name {
+  display: block;
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.95em;
+}
+
+.dropdown-user-email {
+  display: block;
+  font-size: 0.8em;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 0;
+}
+
+.dropdown-icon {
+  font-size: 1.1em;
+  width: 24px;
+  text-align: center;
 }
 
 @keyframes dropdownFade {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-10px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
-}
-
-.user-menu:hover .user-dropdown {
-  display: block;
 }
 
 .user-dropdown a,
@@ -119,61 +186,59 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 14px 20px;
+  padding: 12px 20px;
   text-align: left;
   border: none;
   background: none;
   color: #1e293b;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 0.95rem;
+  transition: all 0.2s;
+  font-size: 0.9rem;
   font-weight: 500;
-  position: relative;
-  overflow: hidden;
-}
-
-.user-dropdown a::before,
-.user-dropdown button::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 3px;
-  height: 100%;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  transform: scaleY(0);
-  transition: transform 0.3s;
-}
-
-.user-dropdown a:hover::before {
-  transform: scaleY(1);
 }
 
 .user-dropdown a:hover,
 .user-dropdown button:hover {
   background: linear-gradient(135deg, #f0f0ff 0%, #faf5ff 100%);
   color: #6366f1;
-  padding-left: 24px;
 }
 
-.user-dropdown button {
+.user-dropdown .logout-button {
   color: #ef4444;
-  font-weight: 600;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #e2e8f0;
 }
 
-.user-dropdown button::before {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-}
-
-.user-dropdown button:hover {
+.user-dropdown .logout-button:hover {
   background: linear-gradient(145deg, #fef2f2, #fee2e2);
   color: #dc2626;
 }
 
-.user-dropdown button:hover::before {
-  transform: scaleY(1);
+/* Bouton déconnexion rapide */
+.btn-quick-logout {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.25));
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-quick-logout:hover {
+  background: linear-gradient(145deg, #ef4444, #dc2626);
+  border-color: #ef4444;
+  transform: scale(1.1) rotate(-5deg);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+.btn-quick-logout:active {
+  transform: scale(0.95);
 }
 
 /* ==========================================
@@ -264,7 +329,24 @@ body.dark-mode .user-name:hover {
 
 body.dark-mode .user-dropdown {
   background: #1e293b;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .dropdown-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .dropdown-user-name {
+  color: #e2e8f0;
+}
+
+body.dark-mode .dropdown-user-email {
+  color: #64748b;
+}
+
+body.dark-mode .dropdown-divider {
+  background: #334155;
 }
 
 body.dark-mode .user-dropdown a,
@@ -277,22 +359,24 @@ body.dark-mode .user-dropdown a:hover {
   color: #818cf8;
 }
 
-body.dark-mode .user-dropdown a::before {
-  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
-}
-
-body.dark-mode .user-dropdown button {
+body.dark-mode .user-dropdown .logout-button {
   border-top-color: #334155;
   color: #f87171;
 }
 
-body.dark-mode .user-dropdown button::before {
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-}
-
-body.dark-mode .user-dropdown button:hover {
+body.dark-mode .user-dropdown .logout-button:hover {
   background: linear-gradient(145deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08));
   color: #fca5a5;
+}
+
+body.dark-mode .btn-quick-logout {
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.3));
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+body.dark-mode .btn-quick-logout:hover {
+  background: linear-gradient(145deg, #ef4444, #dc2626);
+  border-color: #ef4444;
 }
 
 body.dark-mode .layout-nav {

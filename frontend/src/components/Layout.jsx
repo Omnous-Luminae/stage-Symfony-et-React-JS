@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import api from '../api/axios'
 import './Layout.css'
@@ -9,6 +9,8 @@ function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [isAdmin, setIsAdmin] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const menuRef = useRef(null)
 
   // Check if user is admin
   useEffect(() => {
@@ -21,11 +23,23 @@ function Layout({ children }) {
     }
   }, [isAuthenticated])
 
+  // Fermer le menu si on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const handleLogout = async () => {
     if (!isAuthenticated) {
       navigate('/login')
       return
     }
+    setShowUserMenu(false)
     await logout()
     navigate('/login')
   }
@@ -40,12 +54,48 @@ function Layout({ children }) {
         </div>
         <div className="header-right">
           {isAuthenticated ? (
-            <div className="user-menu">
-              <span className="user-name">👤 {user?.firstName} {user?.lastName}</span>
-              <div className="user-dropdown">
-                <Link to="/settings">Mon Profil</Link>
-                <button onClick={handleLogout}>Déconnexion</button>
+            <div className="header-user-section">
+              {/* Menu utilisateur avec clic */}
+              <div className="user-menu" ref={menuRef}>
+                <button 
+                  className="user-menu-trigger"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                >
+                  <span className="user-avatar">
+                    {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                  </span>
+                  <span className="user-name-text">{user?.firstName} {user?.lastName}</span>
+                  <span className={`dropdown-arrow ${showUserMenu ? 'open' : ''}`}>▼</span>
+                </button>
+                {showUserMenu && (
+                  <div className="user-dropdown show">
+                    <div className="dropdown-header">
+                      <span className="dropdown-user-name">{user?.firstName} {user?.lastName}</span>
+                      <span className="dropdown-user-email">{user?.email}</span>
+                    </div>
+                    <div className="dropdown-divider"></div>
+                    <Link to="/settings" onClick={() => setShowUserMenu(false)}>
+                      <span className="dropdown-icon">👤</span> Mon Profil
+                    </Link>
+                    <Link to="/settings" onClick={() => setShowUserMenu(false)}>
+                      <span className="dropdown-icon">⚙️</span> Paramètres
+                    </Link>
+                    <div className="dropdown-divider"></div>
+                    <button onClick={handleLogout} className="logout-button">
+                      <span className="dropdown-icon">🚪</span> Déconnexion
+                    </button>
+                  </div>
+                )}
               </div>
+              
+              {/* Bouton de déconnexion rapide toujours visible */}
+              <button 
+                className="btn-quick-logout" 
+                onClick={handleLogout}
+                title="Se déconnecter"
+              >
+                🚪
+              </button>
             </div>
           ) : (
             <Link
