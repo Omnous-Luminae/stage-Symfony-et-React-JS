@@ -131,6 +131,14 @@ function Layout({ children }) {
               >
                 📅 Calendrier
               </Link>
+              {user?.role !== 'Élève' && (
+                <Link 
+                  to="/incidents" 
+                  className={isActive('/incidents') ? 'nav-link active' : 'nav-link'}
+                >
+                  🎫 Incidents
+                </Link>
+              )}
               {isAdmin && (
                 <Link 
                   to="/admin" 

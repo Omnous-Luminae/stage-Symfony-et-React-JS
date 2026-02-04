@@ -21,11 +21,12 @@ CREATE TABLE IF NOT EXISTS user_roles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insérer les rôles par défaut (basés sur les constantes existantes)
+-- Note: is_system = FALSE pour permettre aux admins de les modifier
 INSERT INTO user_roles (name, code, description, color, icon, is_system, display_order, can_create_events, can_create_public_events, can_share_calendars) VALUES
-('Élève', 'ELEVE', 'Étudiants et apprenants', '#3b82f6', '🎓', TRUE, 1, TRUE, FALSE, FALSE),
-('Professeur', 'PROFESSEUR', 'Enseignants et formateurs', '#10b981', '👨‍🏫', TRUE, 2, TRUE, TRUE, TRUE),
-('Personnel', 'PERSONNEL', 'Personnel administratif et technique', '#f59e0b', '👤', TRUE, 3, TRUE, FALSE, TRUE),
-('Intervenant', 'INTERVENANT', 'Intervenants externes', '#8b5cf6', '🎤', TRUE, 4, TRUE, FALSE, TRUE)
+('Élève', 'ELEVE', 'Étudiants et apprenants', '#3b82f6', '🎓', FALSE, 1, TRUE, FALSE, FALSE),
+('Professeur', 'PROFESSEUR', 'Enseignants et formateurs', '#10b981', '👨‍🏫', FALSE, 2, TRUE, TRUE, TRUE),
+('Personnel', 'PERSONNEL', 'Personnel administratif et technique', '#f59e0b', '👤', FALSE, 3, TRUE, FALSE, TRUE),
+('Intervenant', 'INTERVENANT', 'Intervenants externes', '#8b5cf6', '🎤', FALSE, 4, TRUE, FALSE, TRUE)
 ON DUPLICATE KEY UPDATE 
     description = VALUES(description),
     color = VALUES(color),

@@ -10,6 +10,7 @@ use App\Repository\CalendarRepository;
 use App\Repository\CalendarPermissionRepository;
 use App\Repository\UserRepository;
 use App\Service\AuditLogService;
+use App\Service\IncidentCalendarService;
 use App\Service\SessionUserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,7 +25,8 @@ class CalendarController extends AbstractController
     public function __construct(
         private AuditLogService $auditLogService,
         private AdministratorRepository $adminRepository,
-        private SessionUserService $sessionUserService
+        private SessionUserService $sessionUserService,
+        private IncidentCalendarService $incidentCalendarService
     ) {}
 
     private function logAction(string $method, ...$args): void
@@ -113,7 +115,7 @@ class CalendarController extends AbstractController
             ];
         }
 
-        // Add public calendars (calendrier général)
+        // Add public calendars (calendrier général et incidents)
         foreach ($publicCalendars as $calendar) {
             // Éviter les doublons si le calendrier public est aussi possédé par l'utilisateur
             $alreadyAdded = false;
@@ -123,6 +125,13 @@ class CalendarController extends AbstractController
                     break;
                 }
             }
+            
+            // Filtrer le calendrier des incidents pour les élèves
+            $isIncidentCalendar = $calendar->getName() === IncidentCalendarService::CALENDAR_NAME;
+            if ($isIncidentCalendar && $user->getRole() === 'Élève') {
+                continue; // Les élèves ne voient pas le calendrier des incidents
+            }
+            
             if (!$alreadyAdded) {
                 $result[] = [
                     'id' => $calendar->getId(),
@@ -132,6 +141,7 @@ class CalendarController extends AbstractController
                     'type' => 'public',
                     'isOwner' => false,
                     'isPublic' => true,
+                    'isIncidentCalendar' => $isIncidentCalendar,
                     'canEdit' => $isAdmin, // Seuls les admins peuvent modifier
                     'owner_id' => $calendar->getOwner()?->getId()
                 ];
@@ -383,7 +393,7 @@ class CalendarController extends AbstractController
         }
     }
 
-    #[Route('/general/init', name: 'init_general', methods: ['POST'])]
+    #[Route('/general/init', name: 'init_general', methods: ['POST'], priority: 10)]
     public function initGeneralCalendar(
         CalendarRepository $calendarRepository,
         EntityManagerInterface $entityManager
@@ -440,7 +450,7 @@ class CalendarController extends AbstractController
         ], 201);
     }
 
-    #[Route('/general', name: 'get_general', methods: ['GET'])]
+    #[Route('/general', name: 'get_general', methods: ['GET'], priority: 10)]
     public function getGeneralCalendar(CalendarRepository $calendarRepository): JsonResponse
     {
         $user = $this->sessionUserService->getCurrentUser();
@@ -464,6 +474,80 @@ class CalendarController extends AbstractController
                 'description' => $calendar->getDescription(),
                 'color' => $calendar->getColor(),
                 'type' => 'public',
+                'canEdit' => $isAdmin
+            ]
+        ]);
+    }
+
+    /**
+     * Initialise le calendrier des incidents (créé automatiquement si nécessaire)
+     */
+    #[Route('/incidents/init', name: 'init_incidents', methods: ['POST'], priority: 10)]
+    public function initIncidentCalendar(): JsonResponse
+    {
+        // Vérifier que l'utilisateur est admin
+        $user = $this->sessionUserService->getCurrentUser();
+        if (!$user || !$this->adminRepository->findByUser($user)) {
+            return $this->json(['error' => 'Admin access required'], 403);
+        }
+
+        try {
+            $calendar = $this->incidentCalendarService->getOrCreateIncidentCalendar();
+            $eventType = $this->incidentCalendarService->getOrCreateIncidentEventType();
+            
+            return $this->json([
+                'message' => 'Calendrier des incidents initialisé avec succès',
+                'calendar' => [
+                    'id' => $calendar->getId(),
+                    'name' => $calendar->getName(),
+                    'description' => $calendar->getDescription(),
+                    'color' => $calendar->getColor(),
+                    'type' => 'public'
+                ],
+                'eventType' => [
+                    'id' => $eventType->getId(),
+                    'name' => $eventType->getName(),
+                    'code' => $eventType->getCode()
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return $this->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Récupère le calendrier des incidents (visible sauf pour les élèves)
+     */
+    #[Route('/incidents', name: 'get_incidents', methods: ['GET'], priority: 10)]
+    public function getIncidentCalendar(CalendarRepository $calendarRepository): JsonResponse
+    {
+        $user = $this->sessionUserService->getCurrentUser();
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], 401);
+        }
+
+        // Les élèves ne peuvent pas voir le calendrier des incidents
+        if ($user->getRole() === 'Élève') {
+            return $this->json(['error' => 'Accès refusé aux élèves'], 403);
+        }
+
+        $calendar = $calendarRepository->findOneBy(['name' => IncidentCalendarService::CALENDAR_NAME]);
+        
+        if (!$calendar) {
+            return $this->json(['error' => 'Calendrier des incidents non trouvé', 'exists' => false], 404);
+        }
+
+        $isAdmin = $this->adminRepository->findByUser($user) !== null;
+
+        return $this->json([
+            'exists' => true,
+            'calendar' => [
+                'id' => $calendar->getId(),
+                'name' => $calendar->getName(),
+                'description' => $calendar->getDescription(),
+                'color' => $calendar->getColor(),
+                'type' => 'public',
+                'isIncidentCalendar' => true,
                 'canEdit' => $isAdmin
             ]
         ]);

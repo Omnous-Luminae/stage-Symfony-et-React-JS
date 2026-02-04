@@ -29,6 +29,9 @@ class AuditLog
     public const ENTITY_EVENT = 'event';
     public const ENTITY_ADMIN = 'administrator';
     public const ENTITY_PERMISSION = 'permission';
+    public const ENTITY_INCIDENT = 'incident';
+    public const ENTITY_INCIDENT_CATEGORY = 'incident_category';
+    public const ENTITY_INCIDENT_COMMENT = 'incident_comment';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

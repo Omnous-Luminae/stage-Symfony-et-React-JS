@@ -3,6 +3,7 @@ import DashboardPage from './pages/DashboardPage'
 import CalendarPage from './pages/CalendarPage'
 import SettingsPage from './pages/SettingsPage'
 import AdminPage from './pages/AdminPage'
+import IncidentsPage from './pages/IncidentsPage'
 import LoginPage from './pages/LoginPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import { AuthProvider, RequireAuth } from './auth/AuthContext'
@@ -56,6 +57,14 @@ function App() {
               element={
                 <RequireAuth>
                   <AdminPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/incidents"
+              element={
+                <RequireAuth>
+                  <IncidentsPage />
                 </RequireAuth>
               }
             />

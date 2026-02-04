@@ -248,4 +248,140 @@ class AuditLogService
             $user
         );
     }
+
+    // ========================================
+    // INCIDENT LOGGING METHODS
+    // ========================================
+
+    /**
+     * Log incident creation
+     */
+    public function logIncidentCreated(int $incidentId, array $incidentData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_CREATE,
+            AuditLog::ENTITY_INCIDENT,
+            $incidentId,
+            null,
+            $incidentData,
+            null,
+            $user
+        );
+    }
+
+    /**
+     * Log incident update
+     */
+    public function logIncidentUpdated(int $incidentId, array $oldData, array $newData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_UPDATE,
+            AuditLog::ENTITY_INCIDENT,
+            $incidentId,
+            $oldData,
+            $newData,
+            null,
+            $user
+        );
+    }
+
+    /**
+     * Log incident status change
+     */
+    public function logIncidentStatusChanged(int $incidentId, string $oldStatus, string $newStatus, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            'status_change',
+            AuditLog::ENTITY_INCIDENT,
+            $incidentId,
+            ['status' => $oldStatus],
+            ['status' => $newStatus],
+            null,
+            $user
+        );
+    }
+
+    /**
+     * Log incident deletion
+     */
+    public function logIncidentDeleted(int $incidentId, array $incidentData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_DELETE,
+            AuditLog::ENTITY_INCIDENT,
+            $incidentId,
+            $incidentData,
+            null,
+            null,
+            $user
+        );
+    }
+
+    /**
+     * Log incident comment added
+     */
+    public function logIncidentCommentAdded(int $incidentId, int $commentId, array $commentData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_CREATE,
+            AuditLog::ENTITY_INCIDENT_COMMENT,
+            $commentId,
+            null,
+            array_merge(['incident_id' => $incidentId], $commentData),
+            null,
+            $user
+        );
+    }
+
+    // ========================================
+    // INCIDENT CATEGORY LOGGING METHODS
+    // ========================================
+
+    /**
+     * Log incident category creation
+     */
+    public function logIncidentCategoryCreated(int $categoryId, array $categoryData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_CREATE,
+            AuditLog::ENTITY_INCIDENT_CATEGORY,
+            $categoryId,
+            null,
+            $categoryData,
+            null,
+            $user
+        );
+    }
+
+    /**
+     * Log incident category update
+     */
+    public function logIncidentCategoryUpdated(int $categoryId, array $oldData, array $newData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_UPDATE,
+            AuditLog::ENTITY_INCIDENT_CATEGORY,
+            $categoryId,
+            $oldData,
+            $newData,
+            null,
+            $user
+        );
+    }
+
+    /**
+     * Log incident category deletion
+     */
+    public function logIncidentCategoryDeleted(int $categoryId, array $categoryData, ?User $user = null): AuditLog
+    {
+        return $this->log(
+            AuditLog::ACTION_DELETE,
+            AuditLog::ENTITY_INCIDENT_CATEGORY,
+            $categoryId,
+            $categoryData,
+            null,
+            null,
+            $user
+        );
+    }
 }

@@ -18,6 +18,7 @@ services:
       - ./backend/sql:/docker-entrypoint-initdb.d
     networks:
       - stage_network
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password_secure}"]
       interval: 10s
@@ -56,7 +57,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET:-your_secret_key_here}
-      DATABASE_URL: "mysql://${MYSQL_USER:-agenda_user}:${MYSQL_PASSWORD:-agenda_pass_secure}@mysql:3306/${MYSQL_DATABASE:-agenda_db}?serverVersion=8.0"
+      DATABASE_URL: "mysql://${MYSQL_USER:-agenda_user}:${MYSQL_PASSWORD:-agenda_pass_secure}@mysql:3306/${MYSQL_DATABASE:-agenda_db}?serverVersion=10.11.2-MariaDB&charset=utf8mb4"
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-http://localhost:5173}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-%kernel.project_dir%/config/jwt/private.pem}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-%kernel.project_dir%/config/jwt/public.pem}
