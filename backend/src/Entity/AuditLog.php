@@ -36,10 +36,17 @@ class AuditLog
     #[Groups(['log:read'])]
     private ?int $id = null;
 
+    // L'admin qui a fait l'action (peut être null si c'est un utilisateur normal)
     #[ORM\ManyToOne(targetEntity: Administrator::class)]
-    #[ORM\JoinColumn(name: 'admin_id', referencedColumnName: 'id_admin', nullable: false)]
+    #[ORM\JoinColumn(name: 'admin_id', referencedColumnName: 'id_admin', nullable: true)]
     #[Groups(['log:read'])]
     private ?Administrator $admin = null;
+
+    // L'utilisateur qui a fait l'action (toujours renseigné)
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id_user', nullable: true)]
+    #[Groups(['log:read'])]
+    private ?User $user = null;
 
     #[ORM\Column(name: 'action', type: Types::STRING, length: 100)]
     #[Groups(['log:read'])]
@@ -92,6 +99,39 @@ class AuditLog
     {
         $this->admin = $admin;
         return $this;
+    }
+
+    public function getUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function setUser(?User $user): static
+    {
+        $this->user = $user;
+        return $this;
+    }
+
+    /**
+     * Retourne le nom de l'utilisateur qui a fait l'action
+     */
+    public function getPerformerName(): string
+    {
+        if ($this->user) {
+            return $this->user->getFirstName() . ' ' . $this->user->getLastName();
+        }
+        if ($this->admin && $this->admin->getUser()) {
+            return $this->admin->getUser()->getFirstName() . ' ' . $this->admin->getUser()->getLastName();
+        }
+        return 'Système';
+    }
+
+    /**
+     * Vérifie si l'action a été faite par un admin
+     */
+    public function isAdminAction(): bool
+    {
+        return $this->admin !== null;
     }
 
     public function getAction(): string

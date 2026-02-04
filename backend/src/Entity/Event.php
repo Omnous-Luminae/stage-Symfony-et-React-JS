@@ -14,6 +14,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\HasLifecycleCallbacks]
 class Event
 {
+    // Anciennes constantes gardées pour compatibilité
     public const TYPE_COURSE = 'Cours';
     public const TYPE_MEETING = 'Réunion';
     public const TYPE_EXAM = 'Examen';
@@ -47,9 +48,16 @@ class Event
     #[Groups(['event:read', 'event:write'])]
     private ?string $location = null;
 
-    #[ORM\Column(type: 'string', length: 50)]
+    // Ancien champ type gardé pour compatibilité (sera supprimé plus tard)
+    #[ORM\Column(type: 'string', length: 50, nullable: true)]
     #[Groups(['event:read', 'event:write'])]
     private ?string $type = null;
+
+    // Nouvelle relation vers EventType
+    #[ORM\ManyToOne(targetEntity: EventType::class, inversedBy: 'events')]
+    #[ORM\JoinColumn(name: 'event_type_id', referencedColumnName: 'id_event_type', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['event:read', 'event:write'])]
+    private ?EventType $eventType = null;
 
     #[ORM\Column(length: 7, nullable: true)]
     #[Groups(['event:read', 'event:write'])]
@@ -180,27 +188,41 @@ class Event
 
     public function getType(): ?string
     {
+        // Si eventType est défini, retourner son nom pour compatibilité
+        if ($this->eventType !== null) {
+            return $this->eventType->getName();
+        }
         return $this->type;
     }
 
-    public function setType(string $type): static
+    public function setType(?string $type): static
     {
-        $validTypes = [
-            self::TYPE_COURSE,
-            self::TYPE_MEETING,
-            self::TYPE_EXAM,
-            self::TYPE_ADMINISTRATIVE,
-            self::TYPE_TRAINING,
-            self::TYPE_OTHER
-        ];
-
-        if (!in_array($type, $validTypes)) {
-            throw new \InvalidArgumentException('Invalid event type');
-        }
-
+        // Garde la compatibilité avec l'ancien système
         $this->type = $type;
-
         return $this;
+    }
+
+    public function getEventType(): ?EventType
+    {
+        return $this->eventType;
+    }
+
+    public function setEventType(?EventType $eventType): static
+    {
+        $this->eventType = $eventType;
+        // Synchroniser avec l'ancien champ pour compatibilité
+        if ($eventType !== null) {
+            $this->type = $eventType->getName();
+        }
+        return $this;
+    }
+
+    /**
+     * Retourne le code du type d'événement
+     */
+    public function getEventTypeCode(): ?string
+    {
+        return $this->eventType?->getCode();
     }
 
     public function getColor(): ?string

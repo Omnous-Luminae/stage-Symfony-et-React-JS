@@ -3,11 +3,13 @@
 namespace App\Controller\Api;
 
 use App\Entity\Event;
+use App\Entity\EventType;
 use App\Entity\Calendar;
 use App\Entity\User;
 use App\Repository\AdministratorRepository;
 use App\Repository\CalendarPermissionRepository;
 use App\Repository\EventRepository;
+use App\Repository\EventTypeRepository;
 use App\Service\AuditLogService;
 use App\Service\SessionUserService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,32 +25,35 @@ class EventController extends AbstractController
     private AuditLogService $auditLogService;
     private AdministratorRepository $adminRepository;
     private SessionUserService $sessionUserService;
+    private EventTypeRepository $eventTypeRepository;
 
     public function __construct(
         AuditLogService $auditLogService,
         AdministratorRepository $adminRepository,
-        SessionUserService $sessionUserService
+        SessionUserService $sessionUserService,
+        EventTypeRepository $eventTypeRepository
     ) {
         $this->auditLogService = $auditLogService;
         $this->adminRepository = $adminRepository;
         $this->sessionUserService = $sessionUserService;
+        $this->eventTypeRepository = $eventTypeRepository;
     }
 
     /**
-     * Try to log action if current user is admin
+     * Log action for ALL users (not just admins)
      */
-    private function tryLogAction(string $method, ...$args): void
+    private function logAction(string $method, ...$args): void
     {
         try {
             $user = $this->sessionUserService->getCurrentUser();
             if ($user) {
-                $admin = $this->adminRepository->findByUser($user);
-                if ($admin) {
-                    $this->auditLogService->$method(...$args);
-                }
+                // Ajouter l'utilisateur à la fin des arguments
+                $args[] = $user;
+                $this->auditLogService->$method(...$args);
             }
         } catch (\Exception $e) {
             // Silently fail - logging should not break the main operation
+            error_log('Audit log error: ' . $e->getMessage());
         }
     }
 
@@ -195,10 +200,31 @@ class EventController extends AbstractController
             }
             $event->setEndDate($endDate);
             
-            // Mapper le type frontend -> backend
-            $frontendType = $data['type'] ?? 'other';
-            $backendType = self::TYPE_MAPPING[$frontendType] ?? 'Autre';
-            $event->setType($backendType);
+            // Gérer le type d'événement (nouveau système avec eventTypeId ou ancien avec type string)
+            if (isset($data['eventTypeId']) && !empty($data['eventTypeId'])) {
+                // Nouveau système: utiliser l'ID du type
+                $eventType = $this->eventTypeRepository->find($data['eventTypeId']);
+                if ($eventType) {
+                    $event->setEventType($eventType);
+                } else {
+                    // Fallback sur le type par défaut "other"
+                    $eventType = $this->eventTypeRepository->findByCode('other');
+                    if ($eventType) {
+                        $event->setEventType($eventType);
+                    }
+                }
+            } else {
+                // Ancien système: mapper le type frontend -> backend
+                $frontendType = $data['type'] ?? 'other';
+                $backendType = self::TYPE_MAPPING[$frontendType] ?? 'Autre';
+                $event->setType($backendType);
+                
+                // Essayer d'associer le bon EventType aussi
+                $eventType = $this->eventTypeRepository->findByCode($frontendType);
+                if ($eventType) {
+                    $event->setEventType($eventType);
+                }
+            }
             
             $event->setLocation($data['location'] ?? '');
             $event->setDescription($data['description'] ?? '');
@@ -263,7 +289,7 @@ class EventController extends AbstractController
             }
 
             // Log the action if user is admin
-            $this->tryLogAction('logEventCreated', $event->getId(), [
+            $this->logAction('logEventCreated', $event->getId(), [
                 'title' => $event->getTitle(),
                 'start' => $event->getStartDate()->format('Y-m-d H:i'),
                 'end' => $event->getEndDate()->format('Y-m-d H:i'),
@@ -439,7 +465,7 @@ class EventController extends AbstractController
                 $entityManager->flush();
                 
                 // Log deletion of series
-                $this->tryLogAction('logEventDeleted', $eventId, array_merge($eventData, ['deletedSeries' => true]));
+                $this->logAction('logEventDeleted', $eventId, array_merge($eventData, ['deletedSeries' => true]));
                 
                 return $this->json(['message' => 'Event series deleted successfully'], 200);
             }
@@ -469,7 +495,7 @@ class EventController extends AbstractController
                 $entityManager->flush();
                 
                 // Log deletion with promotion info
-                $this->tryLogAction('logEventDeleted', $eventId, array_merge($eventData, [
+                $this->logAction('logEventDeleted', $eventId, array_merge($eventData, [
                     'promotedChildId' => $newParent->getId()
                 ]));
                 
@@ -485,7 +511,7 @@ class EventController extends AbstractController
         $entityManager->flush();
 
         // Log the deletion
-        $this->tryLogAction('logEventDeleted', $eventId, $eventData);
+        $this->logAction('logEventDeleted', $eventId, $eventData);
 
         return $this->json(['message' => 'Event deleted successfully'], 200);
     }
@@ -575,7 +601,7 @@ class EventController extends AbstractController
                 'location' => $event->getLocation(),
                 'description' => $event->getDescription()
             ];
-            $this->tryLogAction('logEventUpdated', $event->getId(), $oldData, $newData);
+            $this->logAction('logEventUpdated', $event->getId(), $oldData, $newData);
 
             // Retourner l'événement mis à jour
             return $this->json($this->eventToArray($event), 200);
@@ -602,9 +628,26 @@ class EventController extends AbstractController
         $calendar = $event->getCalendar();
         error_log('📊 Event ID ' . $event->getId() . ' - Calendar: ' . ($calendar ? $calendar->getName() : 'NULL'));
         
-        // Convertir le type backend -> frontend
-        $backendType = $event->getType();
-        $frontendType = self::TYPE_MAPPING_REVERSE[$backendType] ?? 'other';
+        // Récupérer le type d'événement (nouveau système ou ancien)
+        $eventType = $event->getEventType();
+        $frontendType = 'other';
+        $eventTypeData = null;
+        
+        if ($eventType) {
+            // Nouveau système: utiliser les données de EventType
+            $frontendType = $eventType->getCode();
+            $eventTypeData = [
+                'id' => $eventType->getId(),
+                'name' => $eventType->getName(),
+                'code' => $eventType->getCode(),
+                'color' => $eventType->getColor(),
+                'icon' => $eventType->getIcon(),
+            ];
+        } else {
+            // Ancien système: convertir le type backend -> frontend
+            $backendType = $event->getType();
+            $frontendType = self::TYPE_MAPPING_REVERSE[$backendType] ?? 'other';
+        }
         
         // Informations de récurrence
         $recurrenceInfo = null;
@@ -629,6 +672,7 @@ class EventController extends AbstractController
             'borderColor' => $event->getColor(),
             'extendedProps' => [
                 'type' => $frontendType,
+                'eventType' => $eventTypeData,
                 'location' => $event->getLocation(),
                 'description' => $event->getDescription(),
                 'calendarId' => $calendar ? $calendar->getId() : null,

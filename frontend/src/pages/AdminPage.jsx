@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { calendarService } from '../api/events'
+import eventTypesApi from '../api/eventTypes'
+import userRolesApi from '../api/userRoles'
 import { useNotification } from '../context/NotificationContext'
 import './AdminPage.css'
 
-const ROLES = ['Élève', 'Professeur', 'Personnel', 'Intervenant']
+// Rôles par défaut (fallback si pas chargés depuis la BDD)
+const DEFAULT_ROLES = ['Élève', 'Professeur', 'Personnel', 'Intervenant']
 const STATUSES = ['Actif', 'Inactif']
 
 function AdminPage() {
@@ -67,6 +70,38 @@ function AdminPage() {
   // General calendar state
   const [generalCalendar, setGeneralCalendar] = useState(null)
   const [creatingGeneralCalendar, setCreatingGeneralCalendar] = useState(false)
+
+  // Event types state
+  const [eventTypes, setEventTypes] = useState([])
+  const [showEventTypeModal, setShowEventTypeModal] = useState(false)
+  const [editingEventType, setEditingEventType] = useState(null)
+  const [eventTypeFormData, setEventTypeFormData] = useState({
+    name: '',
+    code: '',
+    description: '',
+    color: '#3788d8',
+    icon: '',
+    isActive: true,
+    displayOrder: 0
+  })
+
+  // User roles state
+  const [userRoles, setUserRoles] = useState([])
+  const [availableRoles, setAvailableRoles] = useState(DEFAULT_ROLES)
+  const [showUserRoleModal, setShowUserRoleModal] = useState(false)
+  const [editingUserRole, setEditingUserRole] = useState(null)
+  const [userRoleFormData, setUserRoleFormData] = useState({
+    name: '',
+    code: '',
+    description: '',
+    color: '#6366f1',
+    icon: '',
+    isActive: true,
+    displayOrder: 0,
+    canCreateEvents: true,
+    canCreatePublicEvents: false,
+    canShareCalendars: true
+  })
 
   // Check admin status
   useEffect(() => {
@@ -146,6 +181,58 @@ function AdminPage() {
     }
   }
 
+  // Load event types
+  const loadEventTypes = useCallback(async () => {
+    try {
+      // Essayer d'abord l'API admin (avec infos complètes)
+      const data = await eventTypesApi.getAllAdmin()
+      setEventTypes(data)
+    } catch (error) {
+      console.error('Error loading event types (admin):', error)
+      // Fallback sur l'API publique
+      try {
+        const data = await eventTypesApi.getAll()
+        // Ajouter les champs manquants avec des valeurs par défaut
+        const enrichedData = data.map(type => ({
+          ...type,
+          isActive: true,
+          eventsCount: 0
+        }))
+        setEventTypes(enrichedData)
+      } catch (fallbackError) {
+        console.error('Error loading event types (public):', fallbackError)
+      }
+    }
+  }, [])
+
+  // Load user roles
+  const loadUserRoles = useCallback(async () => {
+    try {
+      // Essayer d'abord l'API admin (avec infos complètes)
+      const data = await userRolesApi.getAllAdmin()
+      setUserRoles(data)
+      // Mettre à jour les rôles disponibles pour le filtre utilisateur
+      setAvailableRoles(data.filter(r => r.isActive).map(r => r.name))
+    } catch (error) {
+      console.error('Error loading user roles (admin):', error)
+      // Fallback sur l'API publique
+      try {
+        const data = await userRolesApi.getAll()
+        const enrichedData = data.map(role => ({
+          ...role,
+          isActive: true,
+          usersCount: 0
+        }))
+        setUserRoles(enrichedData)
+        setAvailableRoles(data.map(r => r.name))
+      } catch (fallbackError) {
+        console.error('Error loading user roles (public):', fallbackError)
+        // Utiliser les rôles par défaut
+        setAvailableRoles(DEFAULT_ROLES)
+      }
+    }
+  }, [])
+
   // Load user logs (user + administrator entities)
   const loadUserLogs = useCallback(async (page = 1) => {
     try {
@@ -180,18 +267,24 @@ function AdminPage() {
     }
   }, [logsFilters])
 
+  // Effet pour recharger les logs quand les filtres changent
+  useEffect(() => {
+    if (isAdmin && adminPermissions.canViewAuditLogs) {
+      loadUserLogs(1)
+      loadCalendarLogs(1)
+    }
+  }, [logsFilters, isAdmin, adminPermissions.canViewAuditLogs]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (isAdmin) {
       loadStats()
       loadUsers()
       loadAdmins()
       loadGeneralCalendar()
-      if (adminPermissions.canViewAuditLogs) {
-        loadUserLogs()
-        loadCalendarLogs()
-      }
+      loadEventTypes()
+      loadUserRoles()
     }
-  }, [isAdmin, loadStats, loadUsers, loadAdmins, loadGeneralCalendar, loadUserLogs, loadCalendarLogs, adminPermissions.canViewAuditLogs])
+  }, [isAdmin, loadStats, loadUsers, loadAdmins, loadGeneralCalendar, loadEventTypes, loadUserRoles])
 
   // Filtered users
   const filteredUsers = users.filter(user => {
@@ -350,6 +443,161 @@ function AdminPage() {
     setShowLogDetailsModal(true)
   }
 
+  // Event Type management
+  const openEventTypeModal = (eventType = null) => {
+    if (eventType) {
+      setEditingEventType(eventType)
+      setEventTypeFormData({
+        name: eventType.name,
+        code: eventType.code,
+        description: eventType.description || '',
+        color: eventType.color || '#3788d8',
+        icon: eventType.icon || '',
+        isActive: eventType.isActive,
+        displayOrder: eventType.displayOrder || 0
+      })
+    } else {
+      setEditingEventType(null)
+      setEventTypeFormData({
+        name: '',
+        code: '',
+        description: '',
+        color: '#3788d8',
+        icon: '',
+        isActive: true,
+        displayOrder: eventTypes.length + 1
+      })
+    }
+    setShowEventTypeModal(true)
+  }
+
+  const handleEventTypeSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      if (editingEventType) {
+        await eventTypesApi.update(editingEventType.id, eventTypeFormData)
+        showSuccess('Type d\'événement mis à jour')
+      } else {
+        await eventTypesApi.create(eventTypeFormData)
+        showSuccess('Type d\'événement créé')
+      }
+      setShowEventTypeModal(false)
+      loadEventTypes()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur lors de la sauvegarde')
+    }
+  }
+
+  const handleDeleteEventType = async (eventType) => {
+    if (!confirm(`Supprimer le type "${eventType.name}" ? Cette action est irréversible.`)) return
+    try {
+      await eventTypesApi.delete(eventType.id)
+      showSuccess('Type d\'événement supprimé')
+      loadEventTypes()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur lors de la suppression')
+    }
+  }
+
+  const handleToggleEventType = async (eventType) => {
+    try {
+      await eventTypesApi.toggleActive(eventType.id)
+      showSuccess(eventType.isActive ? 'Type désactivé' : 'Type activé')
+      loadEventTypes()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur')
+    }
+  }
+
+  // User Role management
+  const openUserRoleModal = (role = null) => {
+    if (role) {
+      setEditingUserRole(role)
+      setUserRoleFormData({
+        name: role.name,
+        code: role.code,
+        description: role.description || '',
+        color: role.color || '#6366f1',
+        icon: role.icon || '',
+        isActive: role.isActive,
+        displayOrder: role.displayOrder || 0,
+        canCreateEvents: role.canCreateEvents ?? true,
+        canCreatePublicEvents: role.canCreatePublicEvents ?? false,
+        canShareCalendars: role.canShareCalendars ?? true
+      })
+    } else {
+      setEditingUserRole(null)
+      setUserRoleFormData({
+        name: '',
+        code: '',
+        description: '',
+        color: '#6366f1',
+        icon: '',
+        isActive: true,
+        displayOrder: userRoles.length + 1,
+        canCreateEvents: true,
+        canCreatePublicEvents: false,
+        canShareCalendars: true
+      })
+    }
+    setShowUserRoleModal(true)
+  }
+
+  const handleUserRoleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      if (editingUserRole) {
+        await userRolesApi.update(editingUserRole.id, userRoleFormData)
+        showSuccess('Rôle mis à jour')
+      } else {
+        await userRolesApi.create(userRoleFormData)
+        showSuccess('Rôle créé')
+      }
+      setShowUserRoleModal(false)
+      loadUserRoles()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur lors de la sauvegarde')
+    }
+  }
+
+  const handleDeleteUserRole = async (role) => {
+    if (role.isSystem) {
+      showError('Les rôles système ne peuvent pas être supprimés')
+      return
+    }
+    if (!confirm(`Supprimer le rôle "${role.name}" ? Cette action est irréversible.`)) return
+    try {
+      await userRolesApi.delete(role.id)
+      showSuccess('Rôle supprimé')
+      loadUserRoles()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur lors de la suppression')
+    }
+  }
+
+  const handleToggleUserRole = async (role) => {
+    if (role.isSystem) {
+      showError('Les rôles système ne peuvent pas être désactivés')
+      return
+    }
+    try {
+      await userRolesApi.update(role.id, { isActive: !role.isActive })
+      showSuccess(role.isActive ? 'Rôle désactivé' : 'Rôle activé')
+      loadUserRoles()
+    } catch (error) {
+      showError(error.response?.data?.error || 'Erreur')
+    }
+  }
+
+  // Generate code from name
+  const generateCodeFromName = (name) => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+  }
   if (loading) {
     return (
       <div className="admin-page">
@@ -416,6 +664,20 @@ function AdminPage() {
                 onClick={() => setActiveTab('logs')}
               >
                 📋 Journaux d'audit
+              </button>
+            )}
+            <button
+              className={`admin-nav-item ${activeTab === 'eventTypes' ? 'active' : ''}`}
+              onClick={() => setActiveTab('eventTypes')}
+            >
+              🏷️ Types d'événements
+            </button>
+            {adminPermissions.canManageUsers && (
+              <button
+                className={`admin-nav-item ${activeTab === 'userRoles' ? 'active' : ''}`}
+                onClick={() => setActiveTab('userRoles')}
+              >
+                🎭 Rôles utilisateur
               </button>
             )}
           </nav>
@@ -563,7 +825,7 @@ function AdminPage() {
                   className="filter-select"
                 >
                   <option value="">Tous les rôles</option>
-                  {ROLES.map(role => (
+                  {availableRoles.map(role => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>
@@ -737,13 +999,7 @@ function AdminPage() {
               <div className="logs-filters">
                 <select
                   value={logsFilters.action}
-                  onChange={(e) => {
-                    setLogsFilters({...logsFilters, action: e.target.value})
-                    setTimeout(() => {
-                      loadUserLogs(1)
-                      loadCalendarLogs(1)
-                    }, 100)
-                  }}
+                  onChange={(e) => setLogsFilters({...logsFilters, action: e.target.value})}
                   className="filter-select"
                 >
                   <option value="">Toutes les actions</option>
@@ -758,38 +1014,20 @@ function AdminPage() {
                 <input
                   type="date"
                   value={logsFilters.dateFrom}
-                  onChange={(e) => {
-                    setLogsFilters({...logsFilters, dateFrom: e.target.value})
-                    setTimeout(() => {
-                      loadUserLogs(1)
-                      loadCalendarLogs(1)
-                    }, 100)
-                  }}
+                  onChange={(e) => setLogsFilters({...logsFilters, dateFrom: e.target.value})}
                   className="filter-date"
                   placeholder="Date début"
                 />
                 <input
                   type="date"
                   value={logsFilters.dateTo}
-                  onChange={(e) => {
-                    setLogsFilters({...logsFilters, dateTo: e.target.value})
-                    setTimeout(() => {
-                      loadUserLogs(1)
-                      loadCalendarLogs(1)
-                    }, 100)
-                  }}
+                  onChange={(e) => setLogsFilters({...logsFilters, dateTo: e.target.value})}
                   className="filter-date"
                   placeholder="Date fin"
                 />
                 <button 
                   className="btn-action secondary"
-                  onClick={() => {
-                    setLogsFilters({ action: '', dateFrom: '', dateTo: '' })
-                    setTimeout(() => {
-                      loadUserLogs(1)
-                      loadCalendarLogs(1)
-                    }, 100)
-                  }}
+                  onClick={() => setLogsFilters({ action: '', dateFrom: '', dateTo: '' })}
                 >
                   🔄 Réinitialiser
                 </button>
@@ -827,11 +1065,10 @@ function AdminPage() {
                             })}
                           </td>
                           <td>
-                            {log.admin?.user ? (
-                              <span className="log-admin">
-                                {log.admin.user.firstName} {log.admin.user.lastName}
-                              </span>
-                            ) : 'Système'}
+                            <span className={`log-performer ${log.isAdminAction ? 'is-admin' : 'is-user'}`}>
+                              {log.performerName || 'Système'}
+                              {log.isAdminAction && <span className="admin-badge" title="Action admin">👑</span>}
+                            </span>
                           </td>
                           <td>
                             <span className={`action-badge action-${log.action}`}>
@@ -930,11 +1167,10 @@ function AdminPage() {
                             })}
                           </td>
                           <td>
-                            {log.admin?.user ? (
-                              <span className="log-admin">
-                                {log.admin.user.firstName} {log.admin.user.lastName}
-                              </span>
-                            ) : 'Système'}
+                            <span className={`log-performer ${log.isAdminAction ? 'is-admin' : 'is-user'}`}>
+                              {log.performerName || 'Système'}
+                              {log.isAdminAction && <span className="admin-badge" title="Action admin">👑</span>}
+                            </span>
                           </td>
                           <td>
                             <span className={`action-badge action-${log.action}`}>
@@ -1002,6 +1238,201 @@ function AdminPage() {
               </div>
             </div>
           )}
+
+          {/* Event Types Tab */}
+          {activeTab === 'eventTypes' && (
+            <div className="admin-event-types">
+              <div className="section-header">
+                <h2>🏷️ Types d'événements</h2>
+                <button 
+                  className="btn-action primary"
+                  onClick={() => openEventTypeModal()}
+                >
+                  ➕ Nouveau type
+                </button>
+              </div>
+
+              <p className="section-description">
+                Gérez les types d'événements disponibles dans l'application. Chaque type peut avoir une couleur et une icône personnalisées.
+              </p>
+
+              <div className="event-types-grid">
+                {eventTypes.map(eventType => (
+                  <div 
+                    key={eventType.id} 
+                    className={`event-type-card ${!eventType.isActive ? 'inactive' : ''}`}
+                    style={{ borderLeftColor: eventType.color }}
+                  >
+                    <div className="event-type-header">
+                      <div className="event-type-info">
+                        <span className="event-type-icon">{eventType.icon || '📌'}</span>
+                        <div>
+                          <h3>{eventType.name}</h3>
+                          <code className="event-type-code">{eventType.code}</code>
+                        </div>
+                      </div>
+                      <div 
+                        className="event-type-color" 
+                        style={{ backgroundColor: eventType.color }}
+                        title={eventType.color}
+                      />
+                    </div>
+                    
+                    {eventType.description && (
+                      <p className="event-type-description">{eventType.description}</p>
+                    )}
+
+                    <div className="event-type-meta">
+                      <span className={`status-badge ${eventType.isActive ? 'active' : 'inactive'}`}>
+                        {eventType.isActive ? '✅ Actif' : '⏸️ Inactif'}
+                      </span>
+                      <span className="event-type-count">
+                        {eventType.eventsCount || 0} événement(s)
+                      </span>
+                    </div>
+
+                    <div className="event-type-actions">
+                      <button 
+                        className="btn-icon"
+                        title="Modifier"
+                        onClick={() => openEventTypeModal(eventType)}
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        className="btn-icon"
+                        title={eventType.isActive ? 'Désactiver' : 'Activer'}
+                        onClick={() => handleToggleEventType(eventType)}
+                      >
+                        {eventType.isActive ? '⏸️' : '▶️'}
+                      </button>
+                      <button 
+                        className="btn-icon danger"
+                        title="Supprimer"
+                        onClick={() => handleDeleteEventType(eventType)}
+                        disabled={eventType.eventsCount > 0}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {eventTypes.length === 0 && (
+                <div className="no-results">
+                  Aucun type d'événement configuré. Cliquez sur "Nouveau type" pour en créer un.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* User Roles Tab */}
+          {activeTab === 'userRoles' && (
+            <div className="admin-user-roles">
+              <div className="section-header">
+                <h2>🎭 Rôles utilisateur</h2>
+                <button 
+                  className="btn-action primary"
+                  onClick={() => openUserRoleModal()}
+                >
+                  ➕ Nouveau rôle
+                </button>
+              </div>
+
+              <p className="section-description">
+                Gérez les rôles disponibles pour les utilisateurs. Chaque rôle définit les permissions de base de l'utilisateur.
+              </p>
+
+              <div className="user-roles-grid">
+                {userRoles.map(role => (
+                  <div 
+                    key={role.id} 
+                    className={`user-role-card ${!role.isActive ? 'inactive' : ''} ${role.isSystem ? 'system' : ''}`}
+                    style={{ borderLeftColor: role.color }}
+                  >
+                    <div className="user-role-header">
+                      <div className="user-role-info">
+                        <span className="user-role-icon">{role.icon || '👤'}</span>
+                        <div>
+                          <h3>{role.name}</h3>
+                          <code className="user-role-code">{role.code}</code>
+                        </div>
+                      </div>
+                      <div 
+                        className="user-role-color" 
+                        style={{ backgroundColor: role.color }}
+                        title={role.color}
+                      />
+                    </div>
+                    
+                    {role.description && (
+                      <p className="user-role-description">{role.description}</p>
+                    )}
+
+                    <div className="user-role-permissions">
+                      <span className={`permission-badge ${role.canCreateEvents ? 'active' : 'inactive'}`}>
+                        {role.canCreateEvents ? '✅' : '❌'} Créer événements
+                      </span>
+                      <span className={`permission-badge ${role.canCreatePublicEvents ? 'active' : 'inactive'}`}>
+                        {role.canCreatePublicEvents ? '✅' : '❌'} Événements publics
+                      </span>
+                      <span className={`permission-badge ${role.canShareCalendars ? 'active' : 'inactive'}`}>
+                        {role.canShareCalendars ? '✅' : '❌'} Partager calendriers
+                      </span>
+                    </div>
+
+                    <div className="user-role-meta">
+                      <span className={`status-badge ${role.isActive ? 'active' : 'inactive'}`}>
+                        {role.isActive ? '✅ Actif' : '⏸️ Inactif'}
+                      </span>
+                      {role.isSystem && (
+                        <span className="system-badge" title="Rôle système - non modifiable">
+                          🔒 Système
+                        </span>
+                      )}
+                      <span className="user-role-count">
+                        {role.usersCount || 0} utilisateur(s)
+                      </span>
+                    </div>
+
+                    <div className="user-role-actions">
+                      <button 
+                        className="btn-icon"
+                        title={role.isSystem ? "Les rôles système ne sont pas modifiables" : "Modifier"}
+                        onClick={() => openUserRoleModal(role)}
+                        disabled={role.isSystem}
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        className="btn-icon"
+                        title={role.isSystem ? "Les rôles système ne peuvent pas être désactivés" : (role.isActive ? 'Désactiver' : 'Activer')}
+                        onClick={() => handleToggleUserRole(role)}
+                        disabled={role.isSystem}
+                      >
+                        {role.isActive ? '⏸️' : '▶️'}
+                      </button>
+                      <button 
+                        className="btn-icon danger"
+                        title={role.isSystem ? "Les rôles système ne peuvent pas être supprimés" : "Supprimer"}
+                        onClick={() => handleDeleteUserRole(role)}
+                        disabled={role.isSystem || role.usersCount > 0}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {userRoles.length === 0 && (
+                <div className="no-results">
+                  Aucun rôle configuré. Cliquez sur "Nouveau rôle" pour en créer un.
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
 
@@ -1051,7 +1482,7 @@ function AdminPage() {
                       value={userFormData.role}
                       onChange={(e) => setUserFormData({...userFormData, role: e.target.value})}
                     >
-                      {ROLES.map(role => (
+                      {availableRoles.map(role => (
                         <option key={role} value={role}>{role}</option>
                       ))}
                     </select>
@@ -1192,13 +1623,20 @@ function AdminPage() {
                     </span>
                   </div>
                   <div className="log-detail-item">
-                    <span className="log-detail-label">Administrateur</span>
+                    <span className="log-detail-label">Effectué par</span>
                     <span className="log-detail-value">
-                      {selectedLog.admin?.user 
-                        ? `${selectedLog.admin.user.firstName} ${selectedLog.admin.user.lastName}`
-                        : 'Système'}
+                      {selectedLog.performerName || 'Système'}
+                      {selectedLog.isAdminAction && (
+                        <span className="admin-badge" title="Action admin">👑</span>
+                      )}
                     </span>
                   </div>
+                  {selectedLog.user && (
+                    <div className="log-detail-item">
+                      <span className="log-detail-label">Email utilisateur</span>
+                      <span className="log-detail-value">{selectedLog.user.email}</span>
+                    </div>
+                  )}
                   <div className="log-detail-item">
                     <span className="log-detail-label">Action</span>
                     <span className={`action-badge action-${selectedLog.action}`}>
@@ -1274,8 +1712,320 @@ function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* Event Type Modal */}
+      {showEventTypeModal && (
+        <div className="modal-overlay" onClick={() => setShowEventTypeModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingEventType ? '✏️ Modifier' : '➕ Nouveau'} type d'événement</h2>
+              <button className="modal-close" onClick={() => setShowEventTypeModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleEventTypeSubmit}>
+              <div className="modal-body">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Nom *</label>
+                    <input
+                      type="text"
+                      value={eventTypeFormData.name}
+                      onChange={(e) => {
+                        const name = e.target.value
+                        setEventTypeFormData({
+                          ...eventTypeFormData, 
+                          name,
+                          // Auto-generate code if creating new
+                          code: editingEventType ? eventTypeFormData.code : generateCodeFromName(name)
+                        })
+                      }}
+                      placeholder="Ex: Cours, Réunion..."
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Code *</label>
+                    <input
+                      type="text"
+                      value={eventTypeFormData.code}
+                      onChange={(e) => setEventTypeFormData({...eventTypeFormData, code: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')})}
+                      placeholder="Ex: course, meeting..."
+                      pattern="[a-z0-9_]+"
+                      title="Lettres minuscules, chiffres et underscores uniquement"
+                      required
+                    />
+                    <small>Identifiant technique unique (lettres minuscules, chiffres, _)</small>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={eventTypeFormData.description}
+                    onChange={(e) => setEventTypeFormData({...eventTypeFormData, description: e.target.value})}
+                    placeholder="Brève description du type..."
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Couleur</label>
+                    <div className="color-input-group">
+                      <input
+                        type="color"
+                        value={eventTypeFormData.color}
+                        onChange={(e) => setEventTypeFormData({...eventTypeFormData, color: e.target.value})}
+                      />
+                      <input
+                        type="text"
+                        value={eventTypeFormData.color}
+                        onChange={(e) => setEventTypeFormData({...eventTypeFormData, color: e.target.value})}
+                        pattern="#[0-9a-fA-F]{6}"
+                        placeholder="#3788d8"
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Icône (emoji)</label>
+                    <input
+                      type="text"
+                      value={eventTypeFormData.icon}
+                      onChange={(e) => setEventTypeFormData({...eventTypeFormData, icon: e.target.value})}
+                      placeholder="📚"
+                      maxLength={2}
+                    />
+                    <small>Un emoji pour représenter ce type</small>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Ordre d'affichage</label>
+                    <input
+                      type="number"
+                      value={eventTypeFormData.displayOrder}
+                      onChange={(e) => setEventTypeFormData({...eventTypeFormData, displayOrder: parseInt(e.target.value) || 0})}
+                      min="0"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={eventTypeFormData.isActive}
+                        onChange={(e) => setEventTypeFormData({...eventTypeFormData, isActive: e.target.checked})}
+                      />
+                      Type actif
+                    </label>
+                    <small>Les types inactifs ne peuvent pas être utilisés pour de nouveaux événements</small>
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div className="event-type-preview">
+                  <label>Aperçu</label>
+                  <div 
+                    className="preview-badge"
+                    style={{ 
+                      backgroundColor: eventTypeFormData.color + '20',
+                      borderLeft: `4px solid ${eventTypeFormData.color}`
+                    }}
+                  >
+                    <span className="preview-icon">{eventTypeFormData.icon || '📌'}</span>
+                    <span className="preview-name">{eventTypeFormData.name || 'Nom du type'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowEventTypeModal(false)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn-submit">
+                  {editingEventType ? 'Mettre à jour' : 'Créer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Role Modal */}
+      {showUserRoleModal && (
+        <div className="modal-overlay" onClick={() => setShowUserRoleModal(false)}>
+          <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingUserRole ? '✏️ Modifier' : '➕ Nouveau'} rôle utilisateur</h2>
+              <button className="modal-close" onClick={() => setShowUserRoleModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleUserRoleSubmit}>
+              <div className="modal-body">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Nom *</label>
+                    <input
+                      type="text"
+                      value={userRoleFormData.name}
+                      onChange={(e) => {
+                        const name = e.target.value
+                        setUserRoleFormData({
+                          ...userRoleFormData, 
+                          name,
+                          // Auto-generate code if creating new
+                          code: editingUserRole ? userRoleFormData.code : name.toUpperCase().replace(/[^A-Z0-9]/g, '_')
+                        })
+                      }}
+                      placeholder="Ex: Élève, Professeur..."
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Code *</label>
+                    <input
+                      type="text"
+                      value={userRoleFormData.code}
+                      onChange={(e) => setUserRoleFormData({...userRoleFormData, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '')})}
+                      placeholder="Ex: ELEVE, PROFESSEUR..."
+                      pattern="[A-Z0-9_]+"
+                      title="Lettres majuscules, chiffres et underscores uniquement"
+                      required
+                    />
+                    <small>Identifiant technique unique</small>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={userRoleFormData.description}
+                    onChange={(e) => setUserRoleFormData({...userRoleFormData, description: e.target.value})}
+                    placeholder="Brève description du rôle..."
+                  />
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Couleur</label>
+                    <div className="color-input-group">
+                      <input
+                        type="color"
+                        value={userRoleFormData.color}
+                        onChange={(e) => setUserRoleFormData({...userRoleFormData, color: e.target.value})}
+                      />
+                      <input
+                        type="text"
+                        value={userRoleFormData.color}
+                        onChange={(e) => setUserRoleFormData({...userRoleFormData, color: e.target.value})}
+                        pattern="#[0-9a-fA-F]{6}"
+                        placeholder="#6366f1"
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>Icône (emoji)</label>
+                    <input
+                      type="text"
+                      value={userRoleFormData.icon}
+                      onChange={(e) => setUserRoleFormData({...userRoleFormData, icon: e.target.value})}
+                      placeholder="👨‍🎓"
+                      maxLength={4}
+                    />
+                    <small>Un emoji pour représenter ce rôle</small>
+                  </div>
+                </div>
+
+                <div className="form-section">
+                  <h4>🔐 Permissions du rôle</h4>
+                  <div className="permissions-grid">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={userRoleFormData.canCreateEvents}
+                        onChange={(e) => setUserRoleFormData({...userRoleFormData, canCreateEvents: e.target.checked})}
+                      />
+                      <div className="permission-content">
+                        <span>Peut créer des événements</span>
+                        <small>Les utilisateurs avec ce rôle peuvent créer des événements dans leurs calendriers</small>
+                      </div>
+                    </label>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={userRoleFormData.canCreatePublicEvents}
+                        onChange={(e) => setUserRoleFormData({...userRoleFormData, canCreatePublicEvents: e.target.checked})}
+                      />
+                      <div className="permission-content">
+                        <span>Peut créer des événements publics</span>
+                        <small>Les utilisateurs peuvent ajouter des événements au calendrier général</small>
+                      </div>
+                    </label>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={userRoleFormData.canShareCalendars}
+                        onChange={(e) => setUserRoleFormData({...userRoleFormData, canShareCalendars: e.target.checked})}
+                      />
+                      <div className="permission-content">
+                        <span>Peut partager des calendriers</span>
+                        <small>Les utilisateurs peuvent partager leurs calendriers avec d'autres</small>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Ordre d'affichage</label>
+                    <input
+                      type="number"
+                      value={userRoleFormData.displayOrder}
+                      onChange={(e) => setUserRoleFormData({...userRoleFormData, displayOrder: parseInt(e.target.value) || 0})}
+                      min="0"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={userRoleFormData.isActive}
+                        onChange={(e) => setUserRoleFormData({...userRoleFormData, isActive: e.target.checked})}
+                      />
+                      Rôle actif
+                    </label>
+                    <small>Les rôles inactifs ne peuvent pas être assignés à de nouveaux utilisateurs</small>
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div className="user-role-preview">
+                  <label>Aperçu</label>
+                  <div 
+                    className="preview-role-badge"
+                    style={{ 
+                      backgroundColor: userRoleFormData.color + '20',
+                      borderLeft: `4px solid ${userRoleFormData.color}`
+                    }}
+                  >
+                    <span className="preview-icon">{userRoleFormData.icon || '👤'}</span>
+                    <span className="preview-name">{userRoleFormData.name || 'Nom du rôle'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowUserRoleModal(false)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn-submit">
+                  {editingUserRole ? 'Mettre à jour' : 'Créer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 export default AdminPage
+

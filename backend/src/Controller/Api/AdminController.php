@@ -609,6 +609,14 @@ class AdminController extends AbstractController
                         'email' => $log->getAdmin()->getUser()?->getEmail(),
                     ]
                 ] : null,
+                'user' => $log->getUser() ? [
+                    'id' => $log->getUser()->getId(),
+                    'firstName' => $log->getUser()->getFirstName(),
+                    'lastName' => $log->getUser()->getLastName(),
+                    'email' => $log->getUser()->getEmail(),
+                ] : null,
+                'performerName' => $log->getPerformerName(),
+                'isAdminAction' => $log->isAdminAction(),
                 'action' => $log->getAction(),
                 'actionLabel' => $log->getActionLabel(),
                 'entityType' => $log->getEntityType(),
@@ -674,6 +682,13 @@ class AdminController extends AbstractController
                         'lastName' => $log->getAdmin()->getUser()?->getLastName(),
                     ]
                 ] : null,
+                'user' => $log->getUser() ? [
+                    'id' => $log->getUser()->getId(),
+                    'firstName' => $log->getUser()->getFirstName(),
+                    'lastName' => $log->getUser()->getLastName(),
+                ] : null,
+                'performerName' => $log->getPerformerName(),
+                'isAdminAction' => $log->isAdminAction(),
                 'action' => $log->getAction(),
                 'actionLabel' => $log->getActionLabel(),
                 'entityType' => $log->getEntityType(),

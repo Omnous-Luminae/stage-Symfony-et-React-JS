@@ -27,15 +27,19 @@ class CalendarController extends AbstractController
         private SessionUserService $sessionUserService
     ) {}
 
-    private function tryLogAction(string $method, ...$args): void
+    private function logAction(string $method, ...$args): void
     {
         try {
             $user = $this->sessionUserService->getCurrentUser();
-            if ($user && $this->adminRepository->findByUser($user)) {
+            // Log actions for ALL users, not just admins
+            if ($user) {
+                // Ajouter l'utilisateur à la fin des arguments
+                $args[] = $user;
                 $this->auditLogService->$method(...$args);
             }
         } catch (\Exception $e) {
             // Log silently fails
+            error_log('AuditLog error: ' . $e->getMessage());
         }
     }
 
@@ -170,7 +174,7 @@ class CalendarController extends AbstractController
             $entityManager->flush();
 
             // Log the action if user is admin
-            $this->tryLogAction('logCalendarCreated', $calendar->getId(), [
+            $this->logAction('logCalendarCreated', $calendar->getId(), [
                 'name' => $calendar->getName(),
                 'description' => $calendar->getDescription(),
                 'color' => $calendar->getColor(),
@@ -225,7 +229,7 @@ class CalendarController extends AbstractController
             $entityManager->flush();
 
             // Log the action if user is admin
-            $this->tryLogAction('logCalendarUpdated', $calendar->getId(), $oldData, [
+            $this->logAction('logCalendarUpdated', $calendar->getId(), $oldData, [
                 'name' => $calendar->getName(),
                 'description' => $calendar->getDescription(),
                 'color' => $calendar->getColor(),
@@ -267,7 +271,7 @@ class CalendarController extends AbstractController
             $entityManager->flush();
 
             // Log the action if user is admin
-            $this->tryLogAction('logCalendarDeleted', $calendarId, $calendarData);
+            $this->logAction('logCalendarDeleted', $calendarId, $calendarData);
 
             return $this->json(['message' => 'Calendar deleted successfully'], 200);
         } catch (\Exception $e) {
@@ -417,7 +421,7 @@ class CalendarController extends AbstractController
         $entityManager->flush();
 
         // Log l'action
-        $this->tryLogAction('logCalendarCreated', $calendar->getId(), [
+        $this->logAction('logCalendarCreated', $calendar->getId(), [
             'name' => $calendar->getName(),
             'description' => $calendar->getDescription(),
             'color' => $calendar->getColor(),

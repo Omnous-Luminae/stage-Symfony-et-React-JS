@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Administrator;
 use App\Entity\AuditLog;
+use App\Entity\User;
 use App\Repository\AdministratorRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -18,7 +19,7 @@ class AuditLogService
     ) {}
 
     /**
-     * Log an action
+     * Log an action - now logs ALL users, not just admins
      */
     public function log(
         string $action,
@@ -26,23 +27,23 @@ class AuditLogService
         ?int $entityId = null,
         ?array $oldValue = null,
         ?array $newValue = null,
-        ?Administrator $admin = null
+        ?Administrator $admin = null,
+        ?User $user = null
     ): AuditLog {
-        // Get admin from session if not provided
-        if (!$admin) {
+        // Get current user from session if not provided
+        if (!$user) {
             $user = $this->sessionUserService->getCurrentUser();
-            if ($user) {
-                $admin = $this->adminRepository->findByUser($user);
-            }
         }
 
-        // If still no admin, we can't log (only admins can create logs)
-        if (!$admin) {
-            throw new \RuntimeException('Cannot log action: no admin context');
+        // Get admin from session if not provided (optional now)
+        if (!$admin && $user) {
+            $admin = $this->adminRepository->findByUser($user);
         }
 
+        // On peut logger même sans admin maintenant, tant qu'on a un user
         $log = new AuditLog();
-        $log->setAdmin($admin);
+        $log->setAdmin($admin); // Peut être null
+        $log->setUser($user);   // L'utilisateur qui fait l'action
         $log->setAction($action);
         $log->setEntityType($entityType);
         $log->setEntityId($entityId);
@@ -155,84 +156,96 @@ class AuditLogService
     /**
      * Log calendar creation
      */
-    public function logCalendarCreated(int $calendarId, array $calendarData): AuditLog
+    public function logCalendarCreated(int $calendarId, array $calendarData, ?User $user = null): AuditLog
     {
         return $this->log(
             AuditLog::ACTION_CREATE,
             AuditLog::ENTITY_CALENDAR,
             $calendarId,
             null,
-            $calendarData
+            $calendarData,
+            null,
+            $user
         );
     }
 
     /**
      * Log calendar update
      */
-    public function logCalendarUpdated(int $calendarId, array $oldData, array $newData): AuditLog
+    public function logCalendarUpdated(int $calendarId, array $oldData, array $newData, ?User $user = null): AuditLog
     {
         return $this->log(
             AuditLog::ACTION_UPDATE,
             AuditLog::ENTITY_CALENDAR,
             $calendarId,
             $oldData,
-            $newData
+            $newData,
+            null,
+            $user
         );
     }
 
     /**
      * Log calendar deletion
      */
-    public function logCalendarDeleted(int $calendarId, array $calendarData): AuditLog
+    public function logCalendarDeleted(int $calendarId, array $calendarData, ?User $user = null): AuditLog
     {
         return $this->log(
             AuditLog::ACTION_DELETE,
             AuditLog::ENTITY_CALENDAR,
             $calendarId,
             $calendarData,
-            null
+            null,
+            null,
+            $user
         );
     }
 
     /**
      * Log event creation
      */
-    public function logEventCreated(int $eventId, array $eventData): AuditLog
+    public function logEventCreated(int $eventId, array $eventData, ?User $user = null): AuditLog
     {
         return $this->log(
             AuditLog::ACTION_CREATE,
             AuditLog::ENTITY_EVENT,
             $eventId,
             null,
-            $eventData
+            $eventData,
+            null,
+            $user
         );
     }
 
     /**
      * Log event update
      */
-    public function logEventUpdated(int $eventId, array $oldData, array $newData): AuditLog
+    public function logEventUpdated(int $eventId, array $oldData, array $newData, ?User $user = null): AuditLog
     {
         return $this->log(
             AuditLog::ACTION_UPDATE,
             AuditLog::ENTITY_EVENT,
             $eventId,
             $oldData,
-            $newData
+            $newData,
+            null,
+            $user
         );
     }
 
     /**
      * Log event deletion
      */
-    public function logEventDeleted(int $eventId, array $eventData): AuditLog
+    public function logEventDeleted(int $eventId, array $eventData, ?User $user = null): AuditLog
     {
         return $this->log(
             AuditLog::ACTION_DELETE,
             AuditLog::ENTITY_EVENT,
             $eventId,
             $eventData,
-            null
+            null,
+            null,
+            $user
         );
     }
 }
